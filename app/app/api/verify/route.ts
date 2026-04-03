@@ -14,8 +14,8 @@ const worldChainSepolia = {
   testnet: true,
 } as const;
 
-// ---------- ABI (minimal) ----------
-const abi = [
+// ---------- ABIs ----------
+const gateAbi = [
   {
     type: "function",
     name: "verifyAgent",
@@ -30,12 +30,21 @@ const abi = [
   },
 ] as const;
 
+const resolverAbi = [
+  {
+    type: "function",
+    name: "registerAgent",
+    inputs: [{ name: "agent", type: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
 // ---------- Handler ----------
 export async function POST(request: Request) {
   try {
     const { proof, agentId } = await request.json();
 
-    // Validate input
     if (!proof || !agentId) {
       return NextResponse.json(
         { error: "Missing proof or agentId" },
@@ -44,6 +53,7 @@ export async function POST(request: Request) {
     }
 
     const contractAddress = process.env.HUMANGATE_CONTRACT_ADDRESS as Hex;
+    const resolverAddress = process.env.HUMANGATE_RESOLVER_ADDRESS as Hex | undefined;
     const privateKey = process.env.PRIVATE_KEY as Hex;
     const jwtSecret = process.env.JWT_SECRET ?? "dev-secret";
     const rpcUrl = process.env.WORLD_CHAIN_SEPOLIA_RPC;
@@ -62,7 +72,7 @@ export async function POST(request: Request) {
       proof.proof as Hex
     )[0];
 
-    // Send tx to HumanGate contract
+    // Set up clients
     const account = privateKeyToAccount(privateKey);
     const wallet = createWalletClient({
       account,
@@ -74,9 +84,10 @@ export async function POST(request: Request) {
       transport: http(rpcUrl),
     });
 
+    // 1. Verify agent on-chain via HumanGate
     const txHash = await wallet.writeContract({
       address: contractAddress,
-      abi,
+      abi: gateAbi,
       functionName: "verifyAgent",
       args: [
         agentId as Hex,
@@ -88,11 +99,32 @@ export async function POST(request: Request) {
 
     await pub.waitForTransactionReceipt({ hash: txHash });
 
-    // Mint a session JWT
+    // 2. Register ENS subname via HumanGateResolver
+    let ensName: string | null = null;
+    if (resolverAddress) {
+      try {
+        const ensTx = await wallet.writeContract({
+          address: resolverAddress,
+          abi: resolverAbi,
+          functionName: "registerAgent",
+          args: [agentId as Hex],
+        });
+        await pub.waitForTransactionReceipt({ hash: ensTx });
+        ensName = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
+      } catch (err) {
+        console.warn("ENS registration failed (non-fatal):", err);
+        ensName = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
+      }
+    } else {
+      ensName = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
+    }
+
+    // 3. Mint session JWT
     const secret = new TextEncoder().encode(jwtSecret);
     const sessionToken = await new SignJWT({
       sub: agentId,
       verified: true,
+      ensName,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
@@ -103,6 +135,7 @@ export async function POST(request: Request) {
       verified: true,
       sessionToken,
       txHash,
+      ensName,
     });
   } catch (err: any) {
     console.error("Verification failed:", err);

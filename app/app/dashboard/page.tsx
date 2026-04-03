@@ -13,7 +13,7 @@ const worldChainSepolia = {
   testnet: true,
 } as const;
 
-const abi = [
+const gateAbi = [
   {
     type: "function",
     name: "isVerified",
@@ -23,10 +23,20 @@ const abi = [
   },
 ] as const;
 
+const resolverAbi = [
+  {
+    type: "function",
+    name: "names",
+    inputs: [{ name: "", type: "bytes32" }],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+] as const;
+
 type CheckResult =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "result"; verified: boolean; agent: string }
+  | { status: "result"; verified: boolean; agent: string; ensName: string | null }
   | { status: "error"; message: string };
 
 export default function DashboardPage() {
@@ -34,6 +44,7 @@ export default function DashboardPage() {
   const [result, setResult] = useState<CheckResult>({ status: "idle" });
 
   const contractAddress = process.env.NEXT_PUBLIC_HUMANGATE_CONTRACT as Address | undefined;
+  const resolverAddress = process.env.NEXT_PUBLIC_RESOLVER_CONTRACT as Address | undefined;
 
   async function checkAgent() {
     if (!contractAddress) {
@@ -50,12 +61,38 @@ export default function DashboardPage() {
 
       const verified = await client.readContract({
         address: contractAddress,
-        abi,
+        abi: gateAbi,
         functionName: "isVerified",
         args: [agent as Address],
       });
 
-      setResult({ status: "result", verified, agent });
+      // Check ENS name registration
+      let ensName: string | null = null;
+      if (verified) {
+        ensName = `${agent.toLowerCase()}.humanbacked.eth`;
+
+        // Verify on-chain registration if resolver is configured
+        if (resolverAddress) {
+          try {
+            const { keccak256, toBytes } = await import("viem");
+            const label = agent.toLowerCase();
+            const labelhash = keccak256(toBytes(label));
+            const registered = await client.readContract({
+              address: resolverAddress,
+              abi: resolverAbi,
+              functionName: "names",
+              args: [labelhash],
+            });
+            if (registered === "0x0000000000000000000000000000000000000000") {
+              ensName += " (pending registration)";
+            }
+          } catch {
+            // Resolver not available, show computed name
+          }
+        }
+      }
+
+      setResult({ status: "result", verified, agent, ensName });
     } catch (err: any) {
       setResult({ status: "error", message: err.message });
     }
@@ -97,6 +134,16 @@ export default function DashboardPage() {
             }`}
           >
             <p className="text-sm font-mono break-all mb-2">{result.agent}</p>
+
+            {result.verified && result.ensName && (
+              <div className="mb-3 px-3 py-2 bg-blue-900/30 border border-blue-700 rounded">
+                <p className="text-xs text-blue-300 mb-0.5">ENS Identity</p>
+                <p className="text-sm text-blue-200 font-mono break-all">
+                  {result.ensName}
+                </p>
+              </div>
+            )}
+
             <p className={result.verified ? "text-green-400" : "text-yellow-400"}>
               {result.verified ? "Verified human-backed agent" : "Not verified"}
             </p>
