@@ -1,0 +1,5 @@
+{
+  "name": "humangate",
+  "private": true,
+  "workspaces": ["contracts", "sdk", "app", "demo"]
+}
