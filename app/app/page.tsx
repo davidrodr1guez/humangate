@@ -454,7 +454,7 @@ export default function Home() {
                     {agent && (
                       <IDKitRequestWidget open={open} onOpenChange={setOpen} app_id={appId} action="verify-agent-v3"
                         rp_context={rpContext ?? { rp_id: "", nonce: "", created_at: 0, expires_at: 0, signature: "" }}
-                        allow_legacy_proofs preset={orbLegacy({ signal: agent })} environment="production"
+                        allow_legacy_proofs preset={orbLegacy({ signal: agent })} environment="staging"
                         handleVerify={handleVerify} onSuccess={() => {}} onError={() => {}} />
                     )}
                   </>
