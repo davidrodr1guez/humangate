@@ -4,9 +4,9 @@ import { MouseGlow } from "./mouse-glow";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HumanGate — The Verification Gateway for Human-Backed AI Agents",
+  title: "HumanGate — The Open Standard for Human-Backed AI Agents",
   description:
-    "A shared on-chain whitelist of human-backed AI agents. Verify once with World ID, operate forever.",
+    "A shared on-chain whitelist that any service can query. Verify once with World ID, operate forever.",
 };
 
 function ShieldIcon({ className }: { className?: string }) {

@@ -150,8 +150,8 @@ export default function Home() {
           </h1>
 
           <p className="opacity-0 animate-fade-in-up fill-mode-forwards delay-300 mt-6 text-base sm:text-lg text-white/40 max-w-lg mx-auto leading-relaxed">
-            The verification gateway for the agentic web. A shared on-chain
-            whitelist of human-backed AI agents, powered by World ID.
+            The open standard for human-backed AI agents. One shared
+            whitelist that any service, contract, or protocol can query.
           </p>
         </div>
 

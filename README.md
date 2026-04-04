@@ -8,9 +8,9 @@
 <h1 align="center">HumanGate</h1>
 
 <p align="center">
-  <strong>The verification gateway for the agentic web</strong>
+  <strong>The open standard for human-backed AI agents</strong>
   <br/>
-  <em>A shared on-chain whitelist of human-backed AI agents. Verify once. Agent forever.</em>
+  <em>A shared on-chain whitelist that any service can query. Verify once. Agent forever.</em>
 </p>
 
 <p align="center">
@@ -27,20 +27,38 @@
 
 ## Problem
 
-75%+ of internet traffic is bots. Services have two bad options: block all agents (losing legitimate traffic) or allow everything (getting gamed by bots). There is no shared way to distinguish a human-backed agent from a malicious bot.
+75%+ of internet traffic is bots. Every service builds its own bot detection — CAPTCHAs, API keys, rate limits. None of them answer the real question: *"Is there a real human behind this agent?"*
 
-Every service maintains its own auth — CAPTCHAs, API keys, rate limits. None of them answer the real question: *"Is there a real human behind this agent?"*
+There is no shared standard. Every service reinvents the wheel. Legitimate agents get blocked alongside malicious bots.
 
 ## Solution
 
-HumanGate is a **verification gateway** — a shared on-chain whitelist of human-backed AI agents, powered by World ID.
+HumanGate is an **open standard** for verifying human-backed AI agents — a shared on-chain whitelist that any service, contract, or protocol can query.
+
+```
+   ERC-20    → "Is this a valid token?"
+   ERC-721   → "Who owns this NFT?"
+   HumanGate → "Is this agent human-backed?"
+```
+
+**One interface. One question. Universal answer.**
+
+```solidity
+interface IHumanGate {
+    function isVerified(address agent) external view returns (bool);
+}
+```
+
+Any smart contract, any API, any service — just call `isVerified()`. That's it.
+
+### How it works
 
 ```
                     ┌──────────────────────┐
    Agents           │    HumanGate         │        Services
    (bots +          │    Gateway           │        (faucets, dapps,
     human-backed)   │                      │         APIs, etc.)
-        ───────────>│  on-chain whitelist   │───────────>
+        ───────────>│  shared whitelist    │───────────>
                     │  + EIP-712 passes    │
                     │                      │
                     │  ✓ human-backed      │──> ACCESS
@@ -48,15 +66,44 @@ HumanGate is a **verification gateway** — a shared on-chain whitelist of human
                     └──────────────────────┘
 ```
 
-**How it works:**
-
 1. A human verifies **once** with World ID (ZK proof, Orb level)
 2. The agent's address gets **whitelisted on-chain** (`verifiedAgents[address] = true`)
 3. The agent receives an **ENS identity** (`{address}.humanbacked.eth`) and an **EIP-712 signed pass**
-4. Any service checks the whitelist — on-chain (`isVerified()`) or off-chain (`verifyPass()`, pure ecrecover, 1ms, no gas)
+4. Any service checks the whitelist:
+   - **On-chain:** `IHumanGate(gate).isVerified(agent)` — one line in any Solidity contract
+   - **Off-chain:** `verifyPass(pass)` — pure ecrecover, 1ms, no gas
 5. The agent passes the gateway **autonomously, forever** — the human never intervenes again
 
-> Think of it as a **shared API gateway for the agentic web**, but instead of API keys, it uses proof-of-humanity. Every service behind the gateway inherits the same trust layer — no need for each service to build its own bot detection.
+> Like ERC-20 standardized tokens, HumanGate standardizes the answer to *"is this agent human-backed?"* — so every service doesn't have to build its own bot detection.
+
+## Integrate in 1 Line
+
+**Solidity** — protect any smart contract:
+
+```solidity
+import {IHumanGate} from "./IHumanGate.sol";
+
+contract ProtectedFaucet {
+    IHumanGate public gate;
+
+    function claim() external {
+        require(gate.isVerified(msg.sender), "Not human-backed");
+        // ... your logic
+    }
+}
+```
+
+**TypeScript** — protect any API or service:
+
+```typescript
+import { verifyPass } from "@humangate/sdk";
+
+// Off-chain: verify EIP-712 pass (no gas, no RPC)
+const { valid } = await verifyPass(agentPass, contractAddress);
+
+// On-chain: query the whitelist directly
+const verified = await isAgentVerified(contractAddress, agentAddress);
+```
 
 ## How It Works
 
@@ -369,19 +416,21 @@ PRIVATE_KEY=0x... NEXT_PUBLIC_APP_ID=app_... npm run deploy
 
 ### World — Best use of Agent Kit ($8,000)
 
-HumanGate extends the Agent Kit model: agents are registered with World ID delegation, receive portable EIP-712 passes, and operate autonomously. Any service integrates with one function call (`verifyPass()`). The agent never needs the human again after initial verification.
+HumanGate is the verification layer that Agent Kit needs. Agents register with World ID delegation and receive portable EIP-712 passes. Any service integrates with one interface (`IHumanGate`) or one function (`verifyPass()`). The goal: make `isVerified()` the standard check for human-backed agents across the agentic web.
 
 ### World — Best use of World ID 4.0 ($8,000)
 
-World ID is the root of trust. The ZK proof (Orb verification level) is verified on-chain via the WorldID Router on World Chain mainnet. One human = one nullifier = sybil-resistant. Backend verification of proofs is implemented as required. IDKit v4 with `IDKitRequestWidget` and `orbLegacy` preset.
+World ID is the root of trust behind the standard. The ZK proof (Orb verification level) is verified on-chain via the WorldID Router on World Chain mainnet. One human = one nullifier = sybil-resistant. Backend verification of proofs is implemented as required. IDKit v4 with `IDKitRequestWidget` and `orbLegacy` preset.
 
 ### ENS — Best ENS Integration for AI Agents ($5,000)
 
-- **ENSIP-10 wildcard resolver** — `{address}.humanbacked.eth` resolves dynamically without individual on-chain name registration
-- **Text records** — 6 default metadata fields populated automatically on verification
-- **ENSIP-25 verification loop** — Bidirectional attestation between agent (HumanGate contract) and ENS name (text records pointing back to contract)
+Every agent in the HumanGate whitelist gets an ENS identity — making the standard human-readable:
+
+- **ENSIP-10 wildcard resolver** — `{address}.humanbacked.eth` resolves dynamically, no per-name registration
+- **Text records** — 6 default metadata fields as standardized agent attestation
+- **ENSIP-25 verification loop** — Bidirectional attestation: agent ↔ ENS name (as described in the ENS workshop by Kevin from ENS Labs)
 - **ITextResolver interface** — Standard-compliant text record resolution via `resolve()`
-- **Custom text records** — Agents can set additional metadata (url, avatar, skills, protocols)
+- **Custom text records** — Agents set additional metadata (url, avatar, skills, protocols)
 - **Wildcard text resolution** — Both `addr()` and `text()` resolve through ENSIP-10
 
 ## API Reference
@@ -421,11 +470,20 @@ Verify an EIP-712 pass. No gas, no RPC — pure signature verification.
 { "valid": true, "agent": "0x...", "ensName": "0x...humanbacked.eth" }
 ```
 
-## Key Insight
+## Why a Standard?
 
-> Every service shouldn't have to build its own bot detection.
-> HumanGate is a **shared whitelist** — verify once, access everywhere.
-> The human signs. The agent operates. The gateway protects.
+Today every service builds its own bot detection. That doesn't scale for the agentic web — where millions of agents interact with thousands of services every second.
+
+HumanGate proposes a simple answer: **one shared whitelist, one interface, one question.**
+
+```
+ERC-20  made "is this a valid token?" universal.
+ERC-721 made "who owns this NFT?" universal.
+
+HumanGate makes "is this agent human-backed?" universal.
+```
+
+> The human verifies once. The agent operates forever. The standard protects everyone.
 
 ---
 
