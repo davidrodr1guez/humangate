@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { signRequest } from "@worldcoin/idkit-server";
 
 export async function POST(request: Request) {
   const signingKey = process.env.WLD_SIGNING_KEY;
@@ -14,9 +15,8 @@ export async function POST(request: Request) {
   try {
     const { action } = await request.json();
 
-    // Use IDKit's built-in signing utility
-    // @ts-ignore — module resolution handled by bundler
-    const { signRequest } = await import("@worldcoin/idkit/signing");
+    // signRequest from @worldcoin/idkit-server v1.1.0 uses object params:
+    // signRequest({ signingKeyHex, action?, ttl? })
     const { sig, nonce, createdAt, expiresAt } = signRequest({
       signingKeyHex: signingKey,
       action,
