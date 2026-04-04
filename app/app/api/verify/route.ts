@@ -17,12 +17,10 @@ const worldChain = {
 const gateAbi = [
   {
     type: "function",
-    name: "verifyAgent",
+    name: "registerVerified",
     inputs: [
       { name: "agent", type: "address" },
-      { name: "root", type: "uint256" },
       { name: "nullifierHash", type: "uint256" },
-      { name: "proof", type: "uint256[8]" },
     ],
     outputs: [],
     stateMutability: "nonpayable",
@@ -61,11 +59,12 @@ function getPassDomain(contractAddress: Hex) {
 // ---------- Handler ----------
 export async function POST(request: Request) {
   try {
-    const { proof, agentId } = await request.json();
+    const body = await request.json();
+    const { proof, agentId, idkitPayload } = body;
 
-    if (!proof || !agentId) {
+    if (!agentId) {
       return NextResponse.json(
-        { error: "Missing proof or agentId" },
+        { error: "Missing agentId" },
         { status: 400 }
       );
     }
@@ -75,6 +74,7 @@ export async function POST(request: Request) {
     const privateKey = process.env.PRIVATE_KEY as Hex;
     const jwtSecret = process.env.JWT_SECRET ?? "dev-secret";
     const rpcUrl = process.env.WORLD_CHAIN_RPC;
+    const rpId = process.env.WLD_RP_ID;
 
     if (!contractAddress || !privateKey) {
       return NextResponse.json(
@@ -83,14 +83,46 @@ export async function POST(request: Request) {
       );
     }
 
-    // Decode the ABI-encoded proof into uint256[8]
-    const { decodeAbiParameters } = await import("viem");
-    const proofArray = decodeAbiParameters(
-      [{ type: "uint256[8]" }],
-      proof.proof as Hex
-    )[0];
+    // ---------- Step 1: Verify proof via World ID Cloud API ----------
+    let nullifierHash: string;
 
-    // Set up clients
+    if (idkitPayload) {
+      // Forward IDKit v4 payload as-is to the cloud verification endpoint
+      console.log("Verifying via Cloud API (v4)...");
+      const cloudRes = await fetch(`https://developer.worldcoin.org/api/v4/verify/${rpId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(idkitPayload),
+      });
+
+      if (!cloudRes.ok) {
+        const err = await cloudRes.json().catch(() => ({}));
+        console.error("Cloud verification failed:", err);
+        return NextResponse.json(
+          { error: "World ID verification failed", details: err },
+          { status: 400 }
+        );
+      }
+
+      const cloudData = await cloudRes.json();
+      console.log("Cloud verification OK:", JSON.stringify(cloudData).slice(0, 200));
+
+      // Extract nullifier from the v4 response
+      const response = idkitPayload.responses?.[0];
+      nullifierHash = response?.nullifier ?? "0x0";
+
+    } else if (proof) {
+      // Legacy flow: extract nullifier from proof object
+      console.log("Using legacy proof format...");
+      nullifierHash = proof.nullifier_hash;
+    } else {
+      return NextResponse.json(
+        { error: "Missing proof or idkitPayload" },
+        { status: 400 }
+      );
+    }
+
+    // ---------- Step 2: Register agent on-chain ----------
     const account = privateKeyToAccount(privateKey);
     const wallet = createWalletClient({
       account,
@@ -102,27 +134,28 @@ export async function POST(request: Request) {
       transport: http(rpcUrl),
     });
 
-    // 1. Verify agent on-chain via HumanGate
+    console.log("Registering agent on-chain via registerVerified...");
+    // @ts-ignore
     const txHash = await wallet.writeContract({
       account,
       chain: worldChain,
       address: contractAddress,
       abi: gateAbi,
-      functionName: "verifyAgent",
+      functionName: "registerVerified",
       args: [
         agentId as Hex,
-        BigInt(proof.merkle_root),
-        BigInt(proof.nullifier_hash),
-        proofArray as any,
+        BigInt(nullifierHash),
       ],
     });
 
     await pub.waitForTransactionReceipt({ hash: txHash });
+    console.log("Agent registered on-chain:", txHash);
 
-    // 2. Register ENS subname via HumanGateResolver
-    let ensName: string | null = null;
+    // ---------- Step 3: Register ENS subname ----------
+    let ensName: string | null = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
     if (resolverAddress) {
       try {
+        // @ts-ignore
         const ensTx = await wallet.writeContract({
           account,
           chain: worldChain,
@@ -132,34 +165,29 @@ export async function POST(request: Request) {
           args: [agentId as Hex],
         });
         await pub.waitForTransactionReceipt({ hash: ensTx });
-        ensName = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
+        console.log("ENS registered:", ensTx);
       } catch (err) {
         console.warn("ENS registration failed (non-fatal):", err);
-        ensName = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
       }
-    } else {
-      ensName = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
     }
 
-    // 3. Sign EIP-712 HumanGate Pass
+    // ---------- Step 4: Sign EIP-712 pass ----------
     const issuedAt = BigInt(Math.floor(Date.now() / 1000));
-    const expiresAt = issuedAt + BigInt(24 * 60 * 60); // 24h
-
-    const passData = {
-      agent: agentId as Hex,
-      nullifier: BigInt(proof.nullifier_hash),
-      issuedAt,
-      expiresAt,
-    };
+    const expiresAt = issuedAt + BigInt(24 * 60 * 60);
 
     const signature = await account.signTypedData({
       domain: getPassDomain(contractAddress),
       types: PASS_TYPES,
       primaryType: "HumanGatePass",
-      message: passData,
+      message: {
+        agent: agentId as Hex,
+        nullifier: BigInt(nullifierHash),
+        issuedAt,
+        expiresAt,
+      },
     });
 
-    // 4. Mint session JWT (backward-compatible)
+    // ---------- Step 5: Mint session JWT ----------
     const secret = new TextEncoder().encode(jwtSecret);
     const sessionToken = await new SignJWT({
       sub: agentId,
@@ -178,7 +206,7 @@ export async function POST(request: Request) {
       ensName,
       pass: {
         agent: agentId,
-        nullifier: proof.nullifier_hash,
+        nullifier: nullifierHash,
         issuedAt: Number(issuedAt),
         expiresAt: Number(expiresAt),
         signature,

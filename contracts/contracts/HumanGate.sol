@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// @title HumanGate — on-chain proof-of-humanity for AI agents
-/// @notice Receives a World ID zero-knowledge proof, verifies it via the
-///         WorldID Router, and marks the calling agent address as human-backed.
+/// @title HumanGate — on-chain registry of human-backed AI agents
+/// @notice The open standard for verifying human-backed agents.
+///         Supports two verification paths:
+///         1. On-chain ZK proof via WorldID Router
+///         2. Cloud-verified registration by trusted operator
+///
+///         Any contract can check: IHumanGate(gate).isVerified(agent)
 
 // ---------- Minimal interface to the World ID Router ----------
 interface IWorldID {
@@ -30,6 +34,7 @@ contract HumanGate {
     // ---- state ----
     IWorldID public immutable worldId;
     uint256  public immutable externalNullifierHash;
+    address  public immutable operator;
 
     mapping(uint256 => bool)  internal _usedNullifiers;
     mapping(address => bool)  public   verifiedAgents;
@@ -38,6 +43,7 @@ contract HumanGate {
     event AgentVerified(address indexed agent, uint256 nullifierHash);
 
     error AlreadyVerified();
+    error NotOperator();
 
     // ---- constructor ----
     /// @param _worldId  Address of the WorldID Router on this chain
@@ -45,17 +51,14 @@ contract HumanGate {
     /// @param _action   Action string registered in the Developer Portal
     constructor(IWorldID _worldId, string memory _appId, string memory _action) {
         worldId = _worldId;
+        operator = msg.sender;
         externalNullifierHash = abi
             .encodePacked(abi.encodePacked(_appId).hashToField(), _action)
             .hashToField();
     }
 
-    // ---- core ----
+    // ---- path 1: on-chain ZK verification ----
     /// @notice Verify a World ID proof and register `agent` as human-backed.
-    /// @param agent         Address of the agent being verified
-    /// @param root          Merkle root supplied by IDKit
-    /// @param nullifierHash Nullifier hash supplied by IDKit
-    /// @param proof         ZK proof (8 × uint256) supplied by IDKit
     function verifyAgent(
         address agent,
         uint256 root,
@@ -64,10 +67,9 @@ contract HumanGate {
     ) external {
         if (_usedNullifiers[nullifierHash]) revert AlreadyVerified();
 
-        // signal = agent address → prevents proof reuse across agents
         worldId.verifyProof(
             root,
-            1,  // groupId 1 = Orb credential
+            1,
             abi.encodePacked(agent).hashToField(),
             nullifierHash,
             externalNullifierHash,
@@ -75,12 +77,25 @@ contract HumanGate {
         );
 
         _usedNullifiers[nullifierHash] = true;
-        verifiedAgents[agent]          = true;
+        verifiedAgents[agent] = true;
 
         emit AgentVerified(agent, nullifierHash);
     }
 
-    /// @notice Read-only check
+    // ---- path 2: cloud-verified registration ----
+    /// @notice Register an agent after cloud verification of the World ID proof.
+    ///         Only callable by the trusted operator (backend).
+    function registerVerified(address agent, uint256 nullifierHash) external {
+        if (msg.sender != operator) revert NotOperator();
+        if (_usedNullifiers[nullifierHash]) revert AlreadyVerified();
+
+        _usedNullifiers[nullifierHash] = true;
+        verifiedAgents[agent] = true;
+
+        emit AgentVerified(agent, nullifierHash);
+    }
+
+    /// @notice Read-only check — the standard interface
     function isVerified(address agent) external view returns (bool) {
         return verifiedAgents[agent];
     }

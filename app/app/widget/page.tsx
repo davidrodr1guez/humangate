@@ -368,18 +368,22 @@ export default function WidgetPage() {
     setStatus({ step: "verifying" });
 
     try {
-      // Extract legacy proof fields from v4 response
+      // Send full IDKit payload for cloud verification + legacy proof as fallback
       const response = result.responses?.[0] ?? result;
       const proof = {
         merkle_root: response.merkle_root,
-        nullifier_hash: response.nullifier,
+        nullifier_hash: response.nullifier_hash ?? response.nullifier,
         proof: response.proof,
       };
 
       const res = await fetch("/api/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proof, agentId }),
+        body: JSON.stringify({
+          proof,
+          agentId,
+          idkitPayload: result,
+        }),
       });
 
       const data = await res.json();
