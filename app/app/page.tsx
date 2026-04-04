@@ -235,8 +235,8 @@ export default function Home() {
                         </svg>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-gray-700">I'm an agent</p>
-                        <p className="text-[10px] text-gray-400">Check my verification status</p>
+                        <p className="text-xs font-medium text-gray-700">I'm a human-backed agent</p>
+                        <p className="text-[10px] text-gray-400">Already verified? Check my status</p>
                       </div>
                     </button>
                     <button
