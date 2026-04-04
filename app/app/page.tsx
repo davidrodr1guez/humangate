@@ -60,6 +60,7 @@ type GateState =
 export default function Home() {
   const [agent, setAgent] = useState("");
   const [agentLabel, setAgentLabel] = useState("");
+  const [tab, setTab] = useState<"check" | "register">("check");
   const [state, setState] = useState<GateState>({ step: "gate" });
   const [open, setOpen] = useState(false);
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
@@ -69,9 +70,9 @@ export default function Home() {
   const resolverAddress = process.env.NEXT_PUBLIC_RESOLVER_CONTRACT as Address | undefined;
   const appId = (process.env.NEXT_PUBLIC_APP_ID ?? "app_xxxxx") as `app_${string}`;
 
-  // Fetch RP signature when entering register mode
+  // Fetch RP signature when on register tab
   useEffect(() => {
-    if (state.step !== "register") {
+    if (tab !== "register") {
       setRpReady(false);
       return;
     }
@@ -96,7 +97,7 @@ export default function Home() {
         setRpReady(true);
       })
       .catch(() => setRpReady(true));
-  }, [state.step]);
+  }, [tab]);
 
   async function checkGate() {
     if (!agent || !contractAddress) return;
@@ -321,7 +322,7 @@ export default function Home() {
   }
 
   // ════════════════════════════════════════════
-  // GATE: Checkpoint + Register flow
+  // GATE: Check / Register tabs
   // ════════════════════════════════════════════
   return (
     <main className="relative min-h-screen flex items-center justify-center">
@@ -330,7 +331,7 @@ export default function Home() {
 
       <div className="relative z-10 w-full max-w-sm px-4 py-12">
         {/* Shield */}
-        <div className="flex justify-center mb-8 animate-fade-in">
+        <div className="flex justify-center mb-6 animate-fade-in">
           <div className="relative">
             <div className="absolute inset-0 h-20 w-20 rounded-full bg-accent/10 blur-xl" />
             <svg viewBox="0 0 64 72" fill="none" className="relative h-20 w-20 animate-float">
@@ -345,31 +346,107 @@ export default function Home() {
         </div>
 
         {/* Title */}
-        <div className="text-center mb-8 animate-fade-in-up">
+        <div className="text-center mb-6 animate-fade-in-up">
           <h1 className="text-xl font-bold text-white mb-1.5">HumanGate</h1>
-          <p className="text-xs text-white/30">Verify your agent is human-backed to continue</p>
+          <p className="text-xs text-white/30">The verification gateway for human-backed agents</p>
         </div>
 
         {/* Card */}
-        <div className="glass-card p-5 animate-fade-in-up delay-200 fill-mode-forwards opacity-0">
-          <div className="space-y-4">
-            {/* Agent address — always visible */}
-            <div>
-              <label className="block text-[10px] font-medium uppercase tracking-[0.15em] text-white/25 mb-1.5">Agent Address</label>
-              <input
-                type="text"
-                placeholder="0x..."
-                value={agent}
-                onChange={(e) => setAgent(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={state.step === "register" || state.step === "verifying"}
-                className="input-field font-mono text-sm"
-              />
-            </div>
+        <div className="glass-card animate-fade-in-up delay-200 fill-mode-forwards opacity-0">
+          {/* Tabs */}
+          <div className="flex border-b border-white/[0.06]">
+            <button
+              onClick={() => { setTab("check"); setState({ step: "gate" }); }}
+              className={`flex-1 py-3.5 text-xs font-medium transition-all duration-200 ${
+                tab === "check"
+                  ? "text-white border-b-2 border-accent"
+                  : "text-white/30 hover:text-white/50"
+              }`}
+            >
+              Check Agent
+            </button>
+            <button
+              onClick={() => { setTab("register"); setState({ step: "gate" }); }}
+              className={`flex-1 py-3.5 text-xs font-medium transition-all duration-200 ${
+                tab === "register"
+                  ? "text-white border-b-2 border-accent"
+                  : "text-white/30 hover:text-white/50"
+              }`}
+            >
+              Register Agent
+            </button>
+          </div>
 
-            {/* Register mode: show name field + World ID button */}
-            {(state.step === "register" || state.step === "verifying") && (
-              <div className="space-y-4 animate-fade-in">
+          <div className="p-5">
+            {/* ── CHECK TAB ── */}
+            {tab === "check" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-medium uppercase tracking-[0.15em] text-white/25 mb-1.5">Agent Address or ENS</label>
+                  <input
+                    type="text"
+                    placeholder="0x... or mybot.humanbacked.eth"
+                    value={agent}
+                    onChange={(e) => setAgent(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="input-field font-mono text-sm"
+                  />
+                </div>
+
+                <button
+                  onClick={checkGate}
+                  disabled={!agent || state.step === "checking"}
+                  className="btn-primary w-full py-3.5 text-sm disabled:opacity-40"
+                >
+                  {state.step === "checking" ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                      Checking...
+                    </div>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                        <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2" />
+                        <path d="M6 8l1.5 1.5L10.5 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      Check Status
+                    </>
+                  )}
+                </button>
+
+                {state.step === "blocked" && (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4 animate-fade-in">
+                    <p className="text-sm text-amber-400 font-medium mb-1">Agent not verified</p>
+                    <p className="text-xs text-white/30 mb-3">This agent is not in the HumanGate whitelist.</p>
+                    <button
+                      onClick={() => { setTab("register"); setState({ step: "gate" }); }}
+                      className="inline-flex items-center gap-1.5 text-xs text-accent font-medium hover:text-accent-light transition-colors"
+                    >
+                      Register this agent
+                      <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3">
+                        <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── REGISTER TAB ── */}
+            {tab === "register" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-medium uppercase tracking-[0.15em] text-white/25 mb-1.5">Agent Address</label>
+                  <input
+                    type="text"
+                    placeholder="0x..."
+                    value={agent}
+                    onChange={(e) => setAgent(e.target.value)}
+                    disabled={state.step === "verifying"}
+                    className="input-field font-mono text-sm"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-[10px] font-medium uppercase tracking-[0.15em] text-white/25 mb-1.5">Agent Name</label>
                   <input
@@ -388,33 +465,39 @@ export default function Home() {
                 {state.step === "verifying" ? (
                   <div className="flex flex-col items-center gap-3 py-6">
                     <div className="h-12 w-12 rounded-full border-2 border-accent/20 border-t-accent animate-spin" />
-                    <p className="text-sm text-white/60">Verifying on-chain...</p>
+                    <p className="text-sm text-white/60">Registering on-chain...</p>
                     <div className="w-32 h-1 rounded-full overflow-hidden bg-white/[0.04]">
                       <div className="h-full w-full bg-gradient-to-r from-transparent via-accent/40 to-transparent animate-shimmer bg-200%" />
                     </div>
                   </div>
                 ) : rpReady ? (
                   <>
-                    <button onClick={() => setOpen(true)} className="btn-primary w-full py-3.5 text-sm">
+                    <button
+                      onClick={() => setOpen(true)}
+                      disabled={!agent}
+                      className="btn-primary w-full py-3.5 text-sm disabled:opacity-40"
+                    >
                       <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5">
                         <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" />
                         <circle cx="10" cy="10" r="3" fill="currentColor" opacity="0.4" />
                       </svg>
                       Verify with World ID
                     </button>
-                    <IDKitRequestWidget
-                      open={open}
-                      onOpenChange={setOpen}
-                      app_id={appId}
-                      action="verify-agent"
-                      rp_context={rpContext ?? { rp_id: "", nonce: "", created_at: 0, expires_at: 0, signature: "" }}
-                      allow_legacy_proofs
-                      preset={orbLegacy({ signal: agent })}
-                      environment="production"
-                      handleVerify={handleVerify}
-                      onSuccess={() => {}}
-                      onError={() => setState({ step: "register", agent })}
-                    />
+                    {agent && (
+                      <IDKitRequestWidget
+                        open={open}
+                        onOpenChange={setOpen}
+                        app_id={appId}
+                        action="verify-agent"
+                        rp_context={rpContext ?? { rp_id: "", nonce: "", created_at: 0, expires_at: 0, signature: "" }}
+                        allow_legacy_proofs
+                        preset={orbLegacy({ signal: agent })}
+                        environment="production"
+                        handleVerify={handleVerify}
+                        onSuccess={() => {}}
+                        onError={() => setState({ step: "gate" })}
+                      />
+                    )}
                   </>
                 ) : (
                   <div className="flex items-center justify-center gap-2 py-4">
@@ -422,47 +505,6 @@ export default function Home() {
                     <span className="text-xs text-white/25">Preparing verification...</span>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Check button — visible in gate/checking/blocked states */}
-            {(state.step === "gate" || state.step === "checking" || state.step === "blocked") && (
-              <button
-                onClick={checkGate}
-                disabled={!agent || state.step === "checking"}
-                className="btn-primary w-full py-3.5 text-sm disabled:opacity-40"
-              >
-                {state.step === "checking" ? (
-                  <div className="flex items-center gap-2">
-                    <div className="h-4 w-4 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-                    Checking...
-                  </div>
-                ) : (
-                  <>
-                    <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
-                      <path d="M8 1L2 4.5v3.5c0 3.7 2.56 7.16 6 8 3.44-.84 6-4.3 6-8V4.5L8 1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                      <path d="M5.5 8l2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    Verify
-                  </>
-                )}
-              </button>
-            )}
-
-            {/* Blocked: not verified → register inline */}
-            {state.step === "blocked" && (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4 animate-fade-in">
-                <p className="text-sm text-amber-400 font-medium mb-1">Agent not verified</p>
-                <p className="text-xs text-white/30 mb-3">This agent is not in the HumanGate whitelist yet.</p>
-                <button
-                  onClick={() => setState({ step: "register", agent: (state as any).agent })}
-                  className="inline-flex items-center gap-1.5 text-xs text-accent font-medium hover:text-accent-light transition-colors"
-                >
-                  Register now with World ID
-                  <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3">
-                    <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
               </div>
             )}
           </div>
