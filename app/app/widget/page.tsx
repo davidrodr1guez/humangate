@@ -338,7 +338,10 @@ export default function WidgetPage() {
 
   // Fetch RP signature from backend when agent ID is set
   useEffect(() => {
-    if (!agentId) return;
+    if (!agentId) {
+      setReady(false);
+      return;
+    }
 
     fetch("/api/rp-signature", {
       method: "POST",
@@ -415,7 +418,7 @@ export default function WidgetPage() {
       <div className="absolute inset-0 grid-pattern opacity-30" />
       <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-accent/[0.03] rounded-full blur-[100px]" />
 
-      <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 pt-12 sm:pt-16 pb-20">
+      <div className="relative z-10 flex flex-col items-center px-4 sm:px-6 pt-8 sm:pt-16 pb-32">
         {/* Page header */}
         <div className="text-center mb-8 opacity-0 animate-fade-in-up fill-mode-forwards">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-4 py-1.5 mb-4">
@@ -543,7 +546,7 @@ export default function WidgetPage() {
                 {agentId && ready && status.step !== "verifying" && (
                   <button
                     onClick={() => setOpen(true)}
-                    className="btn-primary w-full py-4 text-sm"
+                    className="btn-primary w-full py-4 text-sm sticky bottom-4"
                   >
                     <svg
                       viewBox="0 0 20 20"
