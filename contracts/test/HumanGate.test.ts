@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { parseEther } from "ethers";
 
 describe("HumanGate", () => {
   it("deploys with correct external nullifier hash", async () => {
@@ -177,5 +178,54 @@ describe("HumanGateResolver", () => {
     const result = await resolver.resolve(dnsName, fullCalldata);
     const decoded = ethers.AbiCoder.defaultAbiCoder().decode(["string"], result);
     expect(decoded[0]).to.equal("true");
+  });
+});
+
+describe("ProtectedFaucet", () => {
+  async function deployFaucetFixture() {
+    const Mock = await ethers.getContractFactory("MockWorldID");
+    const mock = await Mock.deploy();
+
+    const HumanGate = await ethers.getContractFactory("HumanGate");
+    const gate = await HumanGate.deploy(await mock.getAddress(), "app_test", "verify-agent");
+
+    const Faucet = await ethers.getContractFactory("ProtectedFaucet");
+    const faucet = await Faucet.deploy(await gate.getAddress());
+
+    const [owner, agent] = await ethers.getSigners();
+    const proof: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] =
+      [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
+
+    // Fund the faucet
+    await owner.sendTransaction({ to: await faucet.getAddress(), value: parseEther("1") });
+
+    return { gate, faucet, owner, agent, proof };
+  }
+
+  it("rejects unverified agents", async () => {
+    const { faucet, agent } = await deployFaucetFixture();
+
+    await expect(faucet.connect(agent).claim())
+      .to.be.revertedWith("Not human-backed");
+  });
+
+  it("lets verified agents claim", async () => {
+    const { gate, faucet, agent, proof } = await deployFaucetFixture();
+
+    await gate.verifyAgent(agent.address, 1n, 777n, proof);
+
+    await expect(faucet.connect(agent).claim())
+      .to.emit(faucet, "Claimed")
+      .withArgs(agent.address, parseEther("0.001"));
+  });
+
+  it("prevents double claims", async () => {
+    const { gate, faucet, agent, proof } = await deployFaucetFixture();
+
+    await gate.verifyAgent(agent.address, 1n, 888n, proof);
+    await faucet.connect(agent).claim();
+
+    await expect(faucet.connect(agent).claim())
+      .to.be.revertedWith("Already claimed");
   });
 });
