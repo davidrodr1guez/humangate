@@ -49,7 +49,7 @@ export default function Home() {
 
   useEffect(() => {
     if (view.step === "expand" && view.mode === "human") {
-      fetch("/api/rp-signature", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify-agent-v2" }) })
+      fetch("/api/rp-signature", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify-agent-v3" }) })
         .then(r => { if (!r.ok) throw new Error(); return r.json(); })
         .then(data => { setRpContext({ rp_id: data.rp_id, nonce: data.nonce, created_at: data.created_at, expires_at: data.expires_at, signature: data.sig }); setRpReady(true); })
         .catch(() => setRpReady(true));
@@ -452,7 +452,7 @@ export default function Home() {
                       Verify with World ID
                     </button>
                     {agent && (
-                      <IDKitRequestWidget open={open} onOpenChange={setOpen} app_id={appId} action="verify-agent-v2"
+                      <IDKitRequestWidget open={open} onOpenChange={setOpen} app_id={appId} action="verify-agent-v3"
                         rp_context={rpContext ?? { rp_id: "", nonce: "", created_at: 0, expires_at: 0, signature: "" }}
                         allow_legacy_proofs preset={orbLegacy({ signal: agent })} environment="production"
                         handleVerify={handleVerify} onSuccess={() => {}} onError={() => {}} />
