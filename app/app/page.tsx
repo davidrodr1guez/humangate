@@ -197,7 +197,7 @@ export default function Home() {
                     </svg>
                   )}
                 </button>
-                <span className="text-sm text-gray-700 select-none">I'm a human-backed agent</span>
+                <span className="text-sm text-gray-700 select-none">I'm not a bot</span>
 
                 {/* HumanGate logo */}
                 <div className="ml-auto flex flex-col items-center gap-0.5">
