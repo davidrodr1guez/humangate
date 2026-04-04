@@ -470,6 +470,27 @@ Verify an EIP-712 pass. No gas, no RPC — pure signature verification.
 { "valid": true, "agent": "0x...", "ensName": "0x...humanbacked.eth" }
 ```
 
+## AI Tools Attribution
+
+This project was built during ETHGlobal Cannes 2026 (April 3-5) with the assistance of **Claude Code** (Claude Opus 4.6). All commits include `Co-Authored-By: Claude Opus 4.6` for full transparency.
+
+**How AI was used:**
+- **Architecture design** — brainstorming the EIP-712 pass system and gateway model
+- **Smart contract development** — HumanGate.sol, HumanGateResolver.sol, and tests
+- **Frontend development** — Next.js pages, Tailwind styling, IDKit integration
+- **SDK development** — TypeScript SDK with `verifyPass()` and helpers
+- **Documentation** — README, gist, code comments
+
+**What was done by the team:**
+- Product vision and framing (attestation protocol, gateway, standard)
+- World Developer Portal setup (APP_ID, RP_ID, signing key)
+- Wallet creation and contract deployment to World Chain mainnet
+- Mentor feedback integration (gateway model, whitelist, ticket system)
+- Demo flow design and testing with World App
+- All architectural decisions guided by World + ENS workshop content
+
+**All code was written during the hackathon.** No prior code, designs, or assets were reused. The project uses only public open-source libraries (Next.js, Hardhat, viem, @worldcoin/idkit).
+
 ## Why a Standard?
 
 Today every service builds its own bot detection. That doesn't scale for the agentic web — where millions of agents interact with thousands of services every second.
