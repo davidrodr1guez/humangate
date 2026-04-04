@@ -184,6 +184,39 @@ export async function verifyPass(
   return { valid: true };
 }
 
+// ---------- Challenge-response authentication ----------
+
+/**
+ * Authenticate an agent with a HumanGate-protected service.
+ * The agent signs a challenge to prove wallet ownership,
+ * then the service checks isVerified() on-chain.
+ *
+ * This is how an agent "passes the CAPTCHA" autonomously.
+ */
+export async function authenticateAgent(
+  gatewayUrl: string,
+  privateKey: Hex
+): Promise<{ authenticated: boolean; humanBacked: boolean; agent: string }> {
+  const { privateKeyToAccount } = require("viem/accounts") as typeof import("viem/accounts");
+  const account = privateKeyToAccount(privateKey);
+
+  // 1. Get challenge
+  const challengeRes = await fetch(`${gatewayUrl}/api/challenge?agent=${account.address}`);
+  const { nonce, message } = await challengeRes.json();
+
+  // 2. Sign it
+  const signature = await account.signMessage({ message });
+
+  // 3. Submit
+  const authRes = await fetch(`${gatewayUrl}/api/challenge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agent: account.address, nonce, signature }),
+  });
+
+  return authRes.json();
+}
+
 // ---------- Proof decoding helper ----------
 
 export function decodeProof(proofHex: Hex): readonly [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] {
