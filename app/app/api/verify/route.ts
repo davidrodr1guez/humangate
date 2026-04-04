@@ -91,8 +91,13 @@ export async function POST(request: Request) {
 
     if (idkitPayload) {
       // Forward IDKit v4 payload as-is to the cloud verification endpoint
-      console.log("Verifying via Cloud API (v4)...");
-      const cloudRes = await fetch(`https://developer.worldcoin.org/api/v4/verify/${rpId}`, {
+      // Use staging domain when the proof was generated in staging environment (simulator)
+      const isStaging = idkitPayload.environment === "staging";
+      const verifyDomain = isStaging
+        ? "https://staging-developer.worldcoin.org"
+        : "https://developer.world.org";
+      console.log(`Verifying via Cloud API (v4) [${isStaging ? "staging" : "production"}]...`);
+      const cloudRes = await fetch(`${verifyDomain}/api/v4/verify/${rpId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(idkitPayload),
