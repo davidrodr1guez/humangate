@@ -5,7 +5,7 @@ async function main() {
   const WORLD_ID_ROUTER = "0x17B354dD2595411ff79041f930e491A4Df39A278";
 
   const appId  = process.env.NEXT_PUBLIC_APP_ID ?? "app_xxxxx";
-  const action = "verify-agent-v3";
+  const action = "verify-agent-v4";
 
   // 1. Deploy HumanGate
   const HumanGate = await ethers.getContractFactory("HumanGate");

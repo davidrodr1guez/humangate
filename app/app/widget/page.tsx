@@ -346,7 +346,7 @@ export default function WidgetPage() {
     fetch("/api/rp-signature", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "verify-agent-v3" }),
+      body: JSON.stringify({ action: "verify-agent-v4" }),
     })
       .then((r) => {
         if (!r.ok) throw new Error("RP not configured");
@@ -578,7 +578,7 @@ export default function WidgetPage() {
                     open={open}
                     onOpenChange={setOpen}
                     app_id={appId}
-                    action="verify-agent-v3"
+                    action="verify-agent-v4"
                     rp_context={rpContext ?? { rp_id: "", nonce: "", created_at: 0, expires_at: 0, signature: "" }}
                     allow_legacy_proofs
                     preset={orbLegacy({ signal: agentId })}
