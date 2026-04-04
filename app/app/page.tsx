@@ -33,6 +33,7 @@ export default function Home() {
   const [agent, setAgent] = useState("");
   const [agentLabel, setAgentLabel] = useState("");
   const [generatedKey, setGeneratedKey] = useState("");
+  const [showWalletInput, setShowWalletInput] = useState(false);
   const [checked, setChecked] = useState(false);
   const [open, setOpen] = useState(false);
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
@@ -319,25 +320,39 @@ export default function Home() {
                   {agentLabel && <p className="mt-1 text-[11px] text-emerald-500">{agentLabel}.humanbacked.eth</p>}
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-400 mb-1">AGENT WALLET <span className="text-gray-300">(optional)</span></label>
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="0x... or leave empty" value={agent} onChange={e => { setAgent(e.target.value); setGeneratedKey(""); }}
-                      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 font-mono placeholder-gray-300 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 transition-all" />
-                    <button onClick={async () => { const r = await fetch("/api/generate-wallet", { method: "POST" }); const d = await r.json(); setAgent(d.address); setGeneratedKey(d.privateKey); }}
-                      className="shrink-0 rounded-md border border-gray-200 px-2.5 py-2 text-[10px] font-medium text-gray-500 hover:bg-gray-50 transition-colors">
-                      Generate
-                    </button>
-                  </div>
-                  {generatedKey && (
+                  {!agent && !showWalletInput && (
+                    <p className="text-[10px] text-gray-400 mb-1">A wallet will be generated automatically for your agent.
+                      <button onClick={() => setShowWalletInput(true)} className="text-emerald-500 ml-1 hover:underline">I already have a wallet</button>
+                    </p>
+                  )}
+                  {showWalletInput && (
+                    <>
+                      <label className="block text-[10px] font-medium text-gray-400 mb-1">AGENT WALLET</label>
+                      <input type="text" placeholder="0x..." value={agent} onChange={e => { setAgent(e.target.value); setGeneratedKey(""); }}
+                        className="w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 font-mono placeholder-gray-300 outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-100 transition-all" />
+                    </>
+                  )}
+                  {agent && generatedKey && (
                     <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2.5">
-                      <p className="text-[10px] text-amber-600 font-medium mb-1">Save this — shown only once</p>
+                      <p className="text-[10px] text-amber-600 font-medium mb-1">Agent wallet created — save this private key</p>
+                      <p className="text-[10px] font-mono text-gray-500 mb-1">{agent}</p>
                       <p className="text-[10px] font-mono text-amber-700 break-all select-all">{generatedKey}</p>
                     </div>
                   )}
                 </div>
                 {rpReady ? (
                   <>
-                    <button onClick={() => setOpen(true)} disabled={!agent || !agentLabel}
+                    <button onClick={async () => {
+                      if (!agent) {
+                        const r = await fetch("/api/generate-wallet", { method: "POST" });
+                        const d = await r.json();
+                        setAgent(d.address);
+                        setGeneratedKey(d.privateKey);
+                        setTimeout(() => setOpen(true), 100);
+                      } else {
+                        setOpen(true);
+                      }
+                    }} disabled={!agentLabel}
                       className="w-full rounded-md py-2.5 text-sm font-medium text-white transition-all disabled:opacity-40"
                       style={{ background: "#10b981" }}>
                       Verify with World ID
