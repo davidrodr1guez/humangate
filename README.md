@@ -27,9 +27,11 @@
 
 ## Problem
 
-75%+ of internet traffic is bots. Every service builds its own bot detection — CAPTCHAs, API keys, rate limits. None of them answer the real question: *"Is there a real human behind this agent?"*
+As a developer, my AI agents help me test, deploy, and interact with dapps. But every time my agent needs tokens from a faucet — it stops. CAPTCHA. And I have to drop what I'm doing, go to the faucet, solve the CAPTCHA manually, and come back. Every. Single. Time.
 
-There is no shared standard. Every service reinvents the wheel. Legitimate agents get blocked alongside malicious bots.
+It's not just faucets. Bounty platforms, DeFi protocols, APIs, airdrops — they all put up a gate. They all ask the same question: *"Are you human?"* And my agent can't answer — even though I already proved I'm human.
+
+There is no shared standard. Every service builds its own bot detection. Legitimate agents get blocked alongside malicious bots. 75%+ of internet traffic is bots, and CAPTCHAs [can't tell the difference anymore](https://www.coindesk.com/opinion/2025/09/30/kill-the-captcha-they-don-t-work-here-s-what-does).
 
 ## Solution
 
@@ -517,6 +519,16 @@ This project was built during ETHGlobal Cannes 2026 (April 3-5) with the assista
 - All architectural decisions guided by World + ENS workshop content
 
 **All code was written during the hackathon.** No prior code, designs, or assets were reused. The project uses only public open-source libraries (Next.js, Hardhat, viem, @worldcoin/idkit).
+
+## How HumanGate Compares
+
+| Approach | Verification | Per-interaction | Agent-friendly | Standard interface |
+|----------|-------------|-----------------|----------------|-------------------|
+| **CAPTCHA** | Solve puzzle | Every time | No | No |
+| **Gitcoin Passport** | Collect stamps (score ≥ 20) | Check score | No | No |
+| **Proof of Humanity** | Video + vouching | One-time | No | No |
+| **ALTCHA / PoW** | Compute puzzle | Every time | Partial | No |
+| **HumanGate** | World ID (1 scan) | **Never again** | **Yes** | **`isVerified()`** |
 
 ## Why a Standard?
 
