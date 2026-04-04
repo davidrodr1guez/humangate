@@ -434,16 +434,18 @@ export default function Home() {
                 {rpReady ? (
                   <>
                     <button onClick={async () => {
-                      if (!agentRef.current) {
+                      let addr = agentRef.current;
+                      if (!addr) {
                         const r = await fetch("/api/generate-wallet", { method: "POST" });
                         const d = await r.json();
-                        setAgent(d.address);
-                        agentRef.current = d.address;
+                        addr = d.address;
+                        setAgent(addr);
+                        agentRef.current = addr;
                         setGeneratedKey(d.privateKey);
-                        setTimeout(() => setOpen(true), 300);
-                      } else {
-                        setOpen(true);
+                        // Wait for React to re-render so IDKit gets the new signal
+                        await new Promise(resolve => setTimeout(resolve, 500));
                       }
+                      setOpen(true);
                     }} disabled={!agentLabel}
                       className="w-full rounded-md py-2.5 text-sm font-medium text-white transition-all disabled:opacity-40"
                       style={{ background: "#10b981" }}>
