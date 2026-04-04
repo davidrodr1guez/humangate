@@ -28,18 +28,17 @@ import { createPublicClient, http, type Address, type Hex } from "viem";
 const CONTRACT = process.env.HUMANGATE_CONTRACT_ADDRESS as Address | undefined;
 const RESOLVER = process.env.HUMANGATE_RESOLVER_ADDRESS as Address | undefined;
 const VERIFY_URL = process.env.VERIFY_URL ?? "http://localhost:3000/api/verify";
-const RPC = process.env.WORLD_CHAIN_SEPOLIA_RPC ?? "https://worldchain-sepolia.g.alchemy.com/public";
+const RPC = process.env.WORLD_CHAIN_RPC ?? "https://worldchain-mainnet.g.alchemy.com/public";
 const LIVE_MODE = !!CONTRACT;
 
 const AGENT_ADDRESS = "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18" as Address;
 const FAUCET_AMOUNT = "0.1 ETH";
 
 const chain = {
-  id: 4801,
-  name: "World Chain Sepolia",
+  id: 480,
+  name: "World Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: { default: { http: [RPC] } },
-  testnet: true,
 } as const;
 
 const gateAbi = [
@@ -187,7 +186,7 @@ async function main() {
   await sleep(500);
 
   if (LIVE_MODE) {
-    log("⛓️ ", "Submitting proof to HumanGate contract on World Chain Sepolia...");
+    log("⛓️ ", "Submitting proof to HumanGate contract on World Chain...");
     try {
       const res = await fetch(VERIFY_URL, {
         method: "POST",
@@ -213,10 +212,10 @@ async function main() {
       agentIsVerified = true;
     }
   } else {
-    log("⛓️ ", "Submitting proof to HumanGate contract on World Chain Sepolia...");
+    log("⛓️ ", "Submitting proof to HumanGate contract on World Chain...");
     await sleep(1000);
     log("✅", `${colors.green}On-chain verification CONFIRMED${colors.reset}`);
-    log("📝", `${colors.dim}tx: 0x7a3f...b92e (World Chain Sepolia)${colors.reset}`);
+    log("📝", `${colors.dim}tx: 0x7a3f...b92e (World Chain)${colors.reset}`);
     agentIsVerified = true;
   }
   await sleep(400);

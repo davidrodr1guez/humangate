@@ -9,15 +9,14 @@ import {
   type Chain,
 } from "viem";
 
-// ---------- World Chain Sepolia definition ----------
-export const worldChainSepolia: Chain = {
-  id: 4801,
-  name: "World Chain Sepolia",
+// ---------- World Chain definition ----------
+export const worldChain: Chain = {
+  id: 480,
+  name: "World Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://worldchain-sepolia.g.alchemy.com/public"] },
+    default: { http: ["https://worldchain-mainnet.g.alchemy.com/public"] },
   },
-  testnet: true,
 };
 
 // ---------- ABI (only the functions we need) ----------
@@ -51,11 +50,40 @@ export const HUMANGATE_ABI = [
   },
 ] as const;
 
+// ---------- EIP-712 Pass Types ----------
+
+export const PASS_TYPES = {
+  HumanGatePass: [
+    { name: "agent", type: "address" },
+    { name: "nullifier", type: "uint256" },
+    { name: "issuedAt", type: "uint256" },
+    { name: "expiresAt", type: "uint256" },
+  ],
+} as const;
+
+export function getPassDomain(contractAddress: Address) {
+  return {
+    name: "HumanGate",
+    version: "1",
+    chainId: 480,
+    verifyingContract: contractAddress,
+  } as const;
+}
+
+export interface HumanGatePass {
+  agent: Address;
+  nullifier: string;
+  issuedAt: number;
+  expiresAt: number;
+  signature: Hex;
+  signer: Address;
+}
+
 // ---------- Client helpers ----------
 
 export function getPublicClient(rpcUrl?: string): PublicClient {
   return createPublicClient({
-    chain: worldChainSepolia,
+    chain: worldChain,
     transport: http(rpcUrl),
   });
 }
@@ -67,7 +95,7 @@ export function getWalletClient(
   const { privateKeyToAccount } = require("viem/accounts") as typeof import("viem/accounts");
   return createWalletClient({
     account: privateKeyToAccount(privateKey),
-    chain: worldChainSepolia,
+    chain: worldChain,
     transport: http(rpcUrl),
   });
 }
@@ -113,6 +141,47 @@ export async function verifyAgentOnChain(params: VerifyAgentParams): Promise<Hex
 
   await pub.waitForTransactionReceipt({ hash });
   return hash;
+}
+
+// ---------- Pass verification (fully local — no API, no RPC, no gas) ----------
+
+/**
+ * Verify a HumanGate pass locally using ecrecover.
+ * This is the function any service calls to check if an agent is human-backed.
+ * Zero network calls. Pure cryptography.
+ */
+export async function verifyPass(
+  pass: HumanGatePass,
+  contractAddress: Address
+): Promise<{ valid: boolean; reason?: string }> {
+  // 1. Check expiry
+  const now = Math.floor(Date.now() / 1000);
+  if (now > pass.expiresAt) {
+    return { valid: false, reason: "Pass expired" };
+  }
+
+  // 2. Verify EIP-712 signature
+  const { verifyTypedData } = require("viem") as typeof import("viem");
+
+  const valid = await verifyTypedData({
+    address: pass.signer,
+    domain: getPassDomain(contractAddress),
+    types: PASS_TYPES,
+    primaryType: "HumanGatePass",
+    message: {
+      agent: pass.agent,
+      nullifier: BigInt(pass.nullifier),
+      issuedAt: BigInt(pass.issuedAt),
+      expiresAt: BigInt(pass.expiresAt),
+    },
+    signature: pass.signature,
+  });
+
+  if (!valid) {
+    return { valid: false, reason: "Invalid signature" };
+  }
+
+  return { valid: true };
 }
 
 // ---------- Proof decoding helper ----------

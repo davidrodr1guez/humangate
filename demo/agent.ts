@@ -23,7 +23,7 @@ const ACTION = "verify-agent";
 
 // Contract read (optional — check status after verification)
 const CONTRACT_ADDRESS = process.env.HUMANGATE_CONTRACT_ADDRESS as Address | undefined;
-const RPC_URL = process.env.WORLD_CHAIN_SEPOLIA_RPC ?? "https://worldchain-sepolia.g.alchemy.com/public";
+const RPC_URL = process.env.WORLD_CHAIN_RPC ?? "https://worldchain-mainnet.g.alchemy.com/public";
 
 const abi = [
   {
@@ -63,7 +63,7 @@ async function main() {
     app_id: APP_ID,
     action: ACTION,
     signal: AGENT_ADDRESS,
-    environment: "staging", // use simulator for testing
+    environment: "production",
   });
 
   // Step 2 — Print connector URI
@@ -93,11 +93,10 @@ async function manualFlow() {
     console.log("Checking on-chain verification status...");
     const client = createPublicClient({
       chain: {
-        id: 4801,
-        name: "World Chain Sepolia",
+        id: 480,
+        name: "World Chain",
         nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
         rpcUrls: { default: { http: [RPC_URL] } },
-        testnet: true,
       },
       transport: http(RPC_URL),
     });
@@ -143,11 +142,10 @@ async function submitProof(proof: any) {
   if (CONTRACT_ADDRESS) {
     const client = createPublicClient({
       chain: {
-        id: 4801,
-        name: "World Chain Sepolia",
+        id: 480,
+        name: "World Chain",
         nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
         rpcUrls: { default: { http: [RPC_URL] } },
-        testnet: true,
       },
       transport: http(RPC_URL),
     });

@@ -1,8 +1,8 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  // World ID Router on World Chain Sepolia
-  const WORLD_ID_ROUTER = "0x57f928158C3EE7CDad1e4D8642503c4D0201f611";
+  // World ID Router on World Chain (mainnet)
+  const WORLD_ID_ROUTER = "0x17B354dD2595411ff79041f930e491A4Df39A278";
 
   const appId  = process.env.NEXT_PUBLIC_APP_ID ?? "app_xxxxx";
   const action = "verify-agent";

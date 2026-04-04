@@ -4,14 +4,13 @@ import { privateKeyToAccount } from "viem/accounts";
 import { SignJWT } from "jose";
 
 // ---------- Chain ----------
-const worldChainSepolia = {
-  id: 4801,
-  name: "World Chain Sepolia",
+const worldChain = {
+  id: 480,
+  name: "World Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://worldchain-sepolia.g.alchemy.com/public"] },
+    default: { http: ["https://worldchain-mainnet.g.alchemy.com/public"] },
   },
-  testnet: true,
 } as const;
 
 // ---------- ABIs ----------
@@ -40,6 +39,25 @@ const resolverAbi = [
   },
 ] as const;
 
+// ---------- EIP-712 Pass Types ----------
+const PASS_TYPES = {
+  HumanGatePass: [
+    { name: "agent", type: "address" },
+    { name: "nullifier", type: "uint256" },
+    { name: "issuedAt", type: "uint256" },
+    { name: "expiresAt", type: "uint256" },
+  ],
+} as const;
+
+function getPassDomain(contractAddress: Hex) {
+  return {
+    name: "HumanGate",
+    version: "1",
+    chainId: 480,
+    verifyingContract: contractAddress,
+  } as const;
+}
+
 // ---------- Handler ----------
 export async function POST(request: Request) {
   try {
@@ -56,7 +74,7 @@ export async function POST(request: Request) {
     const resolverAddress = process.env.HUMANGATE_RESOLVER_ADDRESS as Hex | undefined;
     const privateKey = process.env.PRIVATE_KEY as Hex;
     const jwtSecret = process.env.JWT_SECRET ?? "dev-secret";
-    const rpcUrl = process.env.WORLD_CHAIN_SEPOLIA_RPC;
+    const rpcUrl = process.env.WORLD_CHAIN_RPC;
 
     if (!contractAddress || !privateKey) {
       return NextResponse.json(
@@ -76,11 +94,11 @@ export async function POST(request: Request) {
     const account = privateKeyToAccount(privateKey);
     const wallet = createWalletClient({
       account,
-      chain: worldChainSepolia,
+      chain: worldChain,
       transport: http(rpcUrl),
     });
     const pub = createPublicClient({
-      chain: worldChainSepolia,
+      chain: worldChain,
       transport: http(rpcUrl),
     });
 
@@ -119,7 +137,25 @@ export async function POST(request: Request) {
       ensName = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
     }
 
-    // 3. Mint session JWT
+    // 3. Sign EIP-712 HumanGate Pass
+    const issuedAt = BigInt(Math.floor(Date.now() / 1000));
+    const expiresAt = issuedAt + BigInt(24 * 60 * 60); // 24h
+
+    const passData = {
+      agent: agentId as Hex,
+      nullifier: BigInt(proof.nullifier_hash),
+      issuedAt,
+      expiresAt,
+    };
+
+    const signature = await account.signTypedData({
+      domain: getPassDomain(contractAddress),
+      types: PASS_TYPES,
+      primaryType: "HumanGatePass",
+      message: passData,
+    });
+
+    // 4. Mint session JWT (backward-compatible)
     const secret = new TextEncoder().encode(jwtSecret);
     const sessionToken = await new SignJWT({
       sub: agentId,
@@ -136,6 +172,14 @@ export async function POST(request: Request) {
       sessionToken,
       txHash,
       ensName,
+      pass: {
+        agent: agentId,
+        nullifier: proof.nullifier_hash,
+        issuedAt: Number(issuedAt),
+        expiresAt: Number(expiresAt),
+        signature,
+        signer: account.address,
+      },
     });
   } catch (err: any) {
     console.error("Verification failed:", err);

@@ -1,100 +1,418 @@
-# HumanGate
+<p align="center">
+  <img src="https://img.shields.io/badge/ETHGlobal-Cannes_2026-blue?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/World_Chain-Mainnet-10b981?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Solidity-0.8.24-363636?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Tests-11%2F11_passing-10b981?style=for-the-badge" />
+</p>
 
-> The CAPTCHA for Human-Backed AI Agents
+<h1 align="center">HumanGate</h1>
 
-HumanGate is a verification protocol that lets AI agents prove they are authorized by a real human — using World ID zero-knowledge proofs — so they can pass CAPTCHA-protected services autonomously, without human intervention.
+<p align="center">
+  <strong>The attestation layer for human-backed AI agents</strong>
+  <br/>
+  <em>Verify once. Agent forever.</em>
+</p>
 
-## The Problem
+<p align="center">
+  <a href="#problem">Problem</a> &bull;
+  <a href="#solution">Solution</a> &bull;
+  <a href="#how-it-works">How It Works</a> &bull;
+  <a href="#deployed-contracts">Contracts</a> &bull;
+  <a href="#demo">Demo</a> &bull;
+  <a href="#tracks">Tracks</a> &bull;
+  <a href="#getting-started">Getting Started</a>
+</p>
 
-Today's internet blocks all agents equally. Faucets, testnets, and dapps use CAPTCHAs to stop bots — but also block legitimate agents acting on behalf of real people. Developers have to babysit their agents every time a CAPTCHA appears.
+---
 
-## The Solution
+## Problem
 
-Instead of "prove you're human," HumanGate asks **"prove your agent is human-backed."** A World ID-verified agent can pass challenges autonomously — claiming faucet tokens, interacting with dapps — without the human owner ever intervening.
+75%+ of internet traffic is bots. CAPTCHAs block all agents equally — including legitimate ones acting on behalf of real people. There is no way to distinguish a human-backed agent from a malicious bot.
+
+Today, if your AI agent tries to claim faucet tokens, interact with a dapp, or access any protected service, it gets blocked. The human has to intervene manually every time. That defeats the purpose of having an agent.
+
+## Solution
+
+HumanGate replaces the per-interaction CAPTCHA challenge with a **one-time verification + portable credential** model.
+
+> CAPTCHA asks: *"Prove you're human — NOW."*
+> HumanGate asks: *"Prove your agent was verified — ONCE."*
+
+The analogy: **CAPTCHA is a bouncer who asks you to solve a puzzle every time you enter the club. HumanGate is the bouncer who checks your wristband.**
+
+The human owner verifies once with World ID. The agent receives an on-chain registration, an ENS identity, and a signed EIP-712 pass. From that point on, the agent operates autonomously — presenting its credential at any HumanGate-protected service without the human ever intervening again.
 
 ## How It Works
 
 ```
-┌─────────┐     ┌──────────────┐     ┌────────────┐     ┌──────────┐
-│  Agent   │────>│  HumanGate   │────>│  World ID  │────>│   ENS    │
-│ arrives  │     │  challenge   │     │  ZK proof  │     │ identity │
-└─────────┘     └──────────────┘     └────────────┘     └──────────┘
+                           ONE-TIME SETUP (human present)
+                          ================================
+
+  Human                World App              HumanGate API              World Chain
+    |                     |                        |                         |
+    |--- scan QR -------->|                        |                         |
+    |                     |--- ZK proof ---------->|                         |
+    |                     |                        |--- verifyAgent() ------>|
+    |                     |                        |<-- tx confirmed --------|
+    |                     |                        |--- registerAgent() ---->|
+    |                     |                        |<-- ENS + text records --|
+    |                     |                        |                         |
+    |<-- pass issued -----|<-- EIP-712 signature --|                         |
+
+
+                        AUTONOMOUS USAGE (agent alone)
+                       ==================================
+
+  Agent                  Any Service           HumanGate SDK
+    |                        |                      |
+    |--- present pass ------>|                      |
+    |                        |--- verifyPass() ---->|
+    |                        |<-- { valid: true } --|
+    |<-- ACCESS GRANTED -----|                      |
+    |                        |                      |
+    |  (no human needed)     | (no gas, no RPC,     |
+    |  (no World App)        |  pure ecrecover)     |
 ```
 
-1. Agent arrives at a HumanGate-protected service
-2. Service presents a HumanGate challenge
-3. Agent generates a ZK proof via World Agent Kit
-4. Proof is verified on-chain (no identity revealed)
-5. Agent passes + receives an ENS identity (`agent.humanbacked.eth`)
+### The Flow
+
+1. **Human verifies once** — World ID ZK proof at Orb verification level
+2. **Agent registered on-chain** — `HumanGate.sol` verifies the proof via WorldID Router and marks the agent as human-backed
+3. **ENS identity assigned** — `HumanGateResolver.sol` creates `{address}.humanbacked.eth` with rich text records (ENSIP-10 wildcard + ENSIP-25 verification loop)
+4. **EIP-712 pass issued** — Portable signed credential the agent carries
+5. **Agent operates forever** — Presents the pass at any service. Verification is pure `ecrecover` — 1ms, zero gas, zero network calls
+
+## Deployed Contracts
+
+> **World Chain Mainnet** (chainId: 480)
+
+| Contract | Address | Explorer |
+|----------|---------|----------|
+| **HumanGate** | `0x5E721782a33Ea3b668C69fDa3Fb80C71aFae5D6a` | [WorldScan](https://worldscan.org/address/0x5E721782a33Ea3b668C69fDa3Fb80C71aFae5D6a) |
+| **HumanGateResolver** | `0xE6009c215F10257795d2c29F64eAc1A28082b640` | [WorldScan](https://worldscan.org/address/0xE6009c215F10257795d2c29F64eAc1A28082b640) |
+
+Uses [WorldID Router](https://worldscan.org/address/0x17B354dD2595411ff79041f930e491A4Df39A278) (`0x17B354dD...`) for on-chain proof verification.
+
+## Demo
+
+### `/demo` — The CAPTCHA Replacement
+
+A token faucet protected by HumanGate. The content is **blurred and locked** until the agent proves it's human-backed:
+
+- Unverified agent arrives → **BLOCKED** (content locked)
+- Agent presents its credential → on-chain check → **ACCESS GRANTED**
+- No puzzle, no QR scan, no human intervention
+
+### `/widget` — Verification Flow
+
+3-step guided flow:
+1. Enter agent address
+2. Verify with World ID (scan QR with World App)
+3. Receive: on-chain registration + ENS identity + EIP-712 pass
+
+### `/dashboard` — Agent Lookup
+
+Query any address to check its on-chain verification status and ENS identity.
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        FRONTEND (Next.js 14)                     │
+│                                                                  │
+│  /demo          /widget           /dashboard                     │
+│  CAPTCHA-like   IDKit v4 +        On-chain                      │
+│  gate demo      verification      agent lookup                   │
+└──────┬──────────────┬──────────────────┬─────────────────────────┘
+       │              │                  │
+       ▼              ▼                  ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                          API LAYER                               │
+│                                                                  │
+│  /api/verify        /api/check-pass       /api/rp-signature      │
+│  Full pipeline:     EIP-712 pass          RP signing for         │
+│  on-chain verify    validation            IDKit v4               │
+│  + ENS register     (ecrecover,                                  │
+│  + sign pass        no gas)                                      │
+└──────┬──────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    WORLD CHAIN (chainId: 480)                    │
+│                                                                  │
+│  ┌─────────────────────┐    ┌────────────────────────────────┐  │
+│  │    HumanGate.sol     │    │   HumanGateResolver.sol        │  │
+│  │                      │    │                                │  │
+│  │  verifyAgent()       │    │  registerAgent()               │  │
+│  │  isVerified()        │    │  text() / setText()            │  │
+│  │                      │    │  resolve() [ENSIP-10]          │  │
+│  │  WorldID Router ──┐  │    │                                │  │
+│  │  ZK proof verify  │  │───>│  {addr}.humanbacked.eth        │  │
+│  │  Nullifier check  │  │    │  Text records (6 default)      │  │
+│  │  Sybil resistance │  │    │  ENSIP-25 verification loop    │  │
+│  └───────────────────┘  │    └────────────────────────────────┘  │
+│                          │                                        │
+└──────────────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                     SDK (TypeScript + viem)                       │
+│                                                                  │
+│  verifyPass()          — Local pass verification (ecrecover)     │
+│  isAgentVerified()     — On-chain status check                   │
+│  verifyAgentOnChain()  — Submit proof to contract                │
+│  getPassDomain()       — EIP-712 domain for any integration      │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+## Smart Contracts
+
+### HumanGate.sol
+
+Core verification contract. Receives a World ID ZK proof, verifies it via the WorldID Router, and marks the agent as human-backed.
+
+```solidity
+function verifyAgent(
+    address agent,
+    uint256 root,
+    uint256 nullifierHash,
+    uint256[8] calldata proof
+) external
+```
+
+- Verifies ZK proof via `IWorldID.verifyProof()`
+- Prevents double-verification (nullifier uniqueness)
+- Emits `AgentVerified(agent, nullifierHash)`
+- Read status: `isVerified(address agent) → bool`
+
+### HumanGateResolver.sol
+
+ENSIP-10 wildcard resolver with ENSIP-25 verification loop. Gives verified agents an ENS identity with rich metadata.
+
+```solidity
+function registerAgent(address agent) external     // Register + set 6 default text records
+function setText(address agent, string key, string value) external  // Custom metadata
+function text(address agent, string key) → string   // Read text records
+function resolve(bytes name, bytes data) → bytes    // ENSIP-10 wildcard (addr + text)
+```
+
+**Default text records set on registration:**
+
+| Key | Example Value |
+|-----|---------------|
+| `humangate.verified` | `"true"` |
+| `humangate.verifiedAt` | `"1712188800"` |
+| `humangate.contract` | `"0x5E72..."` |
+| `humangate.resolver` | `"0xE600..."` |
+| `humangate.chain` | `"480"` |
+| `description` | `"Human-backed AI agent verified via HumanGate + World ID on World Chain"` |
+
+**Interface support:** ExtendedResolver (`0x9061b923`) + ITextResolver (`0x59d1d43c`) + ERC-165
+
+## EIP-712 Pass System
+
+After on-chain verification, the backend signs a portable credential the agent carries everywhere.
+
+```
+Domain: { name: "HumanGate", version: "1", chainId: 480, verifyingContract: <HumanGate> }
+
+HumanGatePass {
+    agent: address       // The verified agent
+    nullifier: uint256   // Anonymized human identifier
+    issuedAt: uint256    // Timestamp
+    expiresAt: uint256   // 24h expiry
+}
+```
+
+**Any service verifies with one function call:**
+
+```typescript
+import { verifyPass } from "@humangate/sdk";
+
+const result = await verifyPass(agentPass, contractAddress);
+// { valid: true } — no API, no RPC, no gas. Pure ecrecover.
+```
 
 ## Tech Stack
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Identity | **World Agent Kit** | Agent authorization by verified humans |
-| Proof | **World ID 4.0** | ZK proof of personhood (1 human = 1 agent) |
-| Naming | **ENS** | Persistent human-readable identity for verified agents |
-| Frontend | **Next.js 14** | Widget + dashboard + API |
-| Contracts | **Solidity / Hardhat** | On-chain verification on World Chain Sepolia |
+| Proof | **World ID 4.0 + IDKit v4** | ZK proof of personhood (Orb level) |
+| Naming | **ENS (ENSIP-10 + ENSIP-25)** | Wildcard resolver + text records + verification loop |
+| Credential | **EIP-712** | Portable signed pass for autonomous access |
+| Chain | **World Chain (480)** | Mainnet deployment |
+| Frontend | **Next.js 14 + Tailwind CSS** | Widget, dashboard, demo, APIs |
+| Contracts | **Solidity 0.8.24 / Hardhat** | On-chain verification + ENS resolver |
+| SDK | **TypeScript + viem** | Client library with `verifyPass()` |
 
 ## Project Structure
 
 ```
-contracts/   → HumanGate.sol (on-chain verification) + tests (3/3 passing)
-sdk/         → TypeScript SDK for service integrations
-app/         → Next.js 14 (embeddable widget + dashboard + verify API)
-demo/        → Headless agent verification demo
+humangate/
+├── contracts/
+│   ├── contracts/
+│   │   ├── HumanGate.sol           — World ID proof verification + agent registry
+│   │   ├── HumanGateResolver.sol   — ENSIP-10 wildcard resolver + text records
+│   │   └── MockWorldID.sol         — Mock for testing
+│   ├── scripts/
+│   │   ├── deploy.ts               — Full deploy (HumanGate + Resolver)
+│   │   └── upgrade-resolver.ts     — Resolver-only redeploy
+│   └── test/
+│       └── HumanGate.test.ts       — 11 tests
+│
+├── app/                             — Next.js 14 application
+│   └── app/
+│       ├── page.tsx                 — Landing page
+│       ├── demo/page.tsx            — CAPTCHA-like faucet demo
+│       ├── widget/page.tsx          — Verification widget (IDKit v4)
+│       ├── dashboard/page.tsx       — Agent lookup dashboard
+│       └── api/
+│           ├── verify/route.ts      — Full verification pipeline
+│           ├── check-pass/route.ts  — EIP-712 pass validation
+│           └── rp-signature/route.ts
+│
+├── sdk/
+│   └── index.ts                     — TypeScript SDK (verifyPass, isAgentVerified, etc.)
+│
+├── demo/
+│   ├── agent.ts                     — Headless agent verification
+│   └── faucet-demo.ts              — Terminal demo for judges
+│
+└── .env.example
+```
+
+## Tests
+
+```
+  HumanGate
+    ✔ deploys with correct external nullifier hash
+    ✔ verifies an agent and emits AgentVerified
+    ✔ reverts on duplicate nullifier
+
+  HumanGateResolver
+    ✔ registers a verified agent and resolves its ENS name
+    ✔ reverts registerAgent for unverified agent
+    ✔ supports ExtendedResolver and ITextResolver interfaces (ENSIP-10)
+    ✔ sets default text records on registration
+    ✔ stores verifiedAt timestamp on registration
+    ✔ allows setting custom text records for verified agents
+    ✔ reverts setText for unverified agent
+    ✔ resolves text records via ENSIP-10 wildcard
+
+  11 passing (453ms)
 ```
 
 ## Getting Started
 
+### Prerequisites
+
+- Node.js 18+
+- World App with Orb verification (for live verification)
+
+### Install & Test
+
 ```bash
-# 1. Install & test contracts
+# 1. Clone
+git clone https://github.com/davidrodr1guez/humangate.git
+cd humangate
+
+# 2. Install & test contracts
 cd contracts && npm install && npm test
 
-# 2. Run the app
-cd app && npm install && npm run dev
+# 3. Run the app
+cd ../app && npm install && npm run dev
 
-# 3. Deploy to World Chain Sepolia
-cd contracts && npm run deploy:sepolia
-
-# 4. Run the demo agent
-cd demo && npm install && AGENT_ADDRESS=0x... npx tsx agent.ts
+# 4. Open in browser
+open http://localhost:3000/demo     # CAPTCHA-like demo
+open http://localhost:3000/widget   # Verification flow
+open http://localhost:3000/dashboard # Agent lookup
 ```
 
-## Environment Variables
+### Environment Variables
 
-Copy `.env.example` to `.env` and fill in:
+Copy `.env.example` to `app/.env`:
 
 | Variable | Source |
 |----------|--------|
-| `NEXT_PUBLIC_APP_ID` | [World Developer Portal](https://developer.world.org) |
+| `NEXT_PUBLIC_APP_ID` | [World Developer Portal](https://developer.worldcoin.org) |
 | `WLD_RP_ID` | World Developer Portal |
 | `WLD_SIGNING_KEY` | World Developer Portal |
 | `PRIVATE_KEY` | Deployer wallet private key |
-| `JWT_SECRET` | Any random secret |
+| `JWT_SECRET` | Any random string |
+| `WORLD_CHAIN_RPC` | Default: `https://worldchain-mainnet.g.alchemy.com/public` |
 
-## Architecture
+### Deploy Contracts
 
-```
-User (World App)
-  │
-  ▼
-Widget (/widget) ──── IDKit v4 ──── World ID ZK Proof
-  │
-  ▼
-API (/api/verify) ──── viem ──── HumanGate.sol (World Chain Sepolia)
-  │                                    │
-  ├── JWT session token                ├── verifyProof() via WorldID Router
-  └── ENS subname registration         └── emit AgentVerified(agent, nullifier)
+```bash
+cd contracts
+PRIVATE_KEY=0x... NEXT_PUBLIC_APP_ID=app_... npm run deploy
 ```
 
 ## Tracks
 
-- **World — Best use of Agent Kit** ($8,000) — Distinguishes human-backed agents from bots
-- **World — Best use of World ID 4.0** ($8,000) — ZK proof as a real constraint for agent access
-- **ENS — Best ENS Integration for AI Agents** ($5,000) — Persistent on-chain identity for verified agents
+### World — Best use of Agent Kit ($8,000)
 
-## License
+HumanGate extends the Agent Kit model: agents are registered with World ID delegation, receive portable EIP-712 passes, and operate autonomously. Any service integrates with one function call (`verifyPass()`). The agent never needs the human again after initial verification.
 
-MIT
+### World — Best use of World ID 4.0 ($8,000)
+
+World ID is the root of trust. The ZK proof (Orb verification level) is verified on-chain via the WorldID Router on World Chain mainnet. One human = one nullifier = sybil-resistant. Backend verification of proofs is implemented as required. IDKit v4 with `IDKitRequestWidget` and `orbLegacy` preset.
+
+### ENS — Best ENS Integration for AI Agents ($5,000)
+
+- **ENSIP-10 wildcard resolver** — `{address}.humanbacked.eth` resolves dynamically without individual on-chain name registration
+- **Text records** — 6 default metadata fields populated automatically on verification
+- **ENSIP-25 verification loop** — Bidirectional attestation between agent (HumanGate contract) and ENS name (text records pointing back to contract)
+- **ITextResolver interface** — Standard-compliant text record resolution via `resolve()`
+- **Custom text records** — Agents can set additional metadata (url, avatar, skills, protocols)
+- **Wildcard text resolution** — Both `addr()` and `text()` resolve through ENSIP-10
+
+## API Reference
+
+### POST `/api/verify`
+Full verification pipeline: on-chain proof + ENS registration + EIP-712 pass.
+
+```json
+// Request
+{
+  "proof": { "merkle_root": "0x...", "nullifier_hash": "0x...", "proof": "0x..." },
+  "agentId": "0x..."
+}
+
+// Response
+{
+  "verified": true,
+  "txHash": "0x...",
+  "ensName": "0x1234...abcd.humanbacked.eth",
+  "sessionToken": "eyJ...",
+  "pass": {
+    "agent": "0x...", "nullifier": "0x...",
+    "issuedAt": 1712188800, "expiresAt": 1712275200,
+    "signature": "0x...", "signer": "0x..."
+  }
+}
+```
+
+### POST `/api/check-pass`
+Verify an EIP-712 pass. No gas, no RPC — pure signature verification.
+
+```json
+// Request
+{ "pass": { "agent": "0x...", "nullifier": "0x...", "issuedAt": 123, "expiresAt": 456, "signature": "0x...", "signer": "0x..." } }
+
+// Response
+{ "valid": true, "agent": "0x...", "ensName": "0x...humanbacked.eth" }
+```
+
+## Key Insight
+
+> A CAPTCHA is challenge-response: solve a puzzle NOW, every time.
+> HumanGate is credential-based: prove you WERE verified, once.
+> The human verifies. The agent operates. Forever.
+
+---
+
+<p align="center">
+  Built at <a href="https://ethglobal.com/events/cannes2026">ETHGlobal Cannes 2026</a>
+</p>
