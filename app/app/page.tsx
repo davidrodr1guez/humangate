@@ -42,6 +42,13 @@ const resolverAbi = [
     outputs: [{ name: "", type: "string" }],
     stateMutability: "view",
   },
+  {
+    type: "function",
+    name: "names",
+    inputs: [{ name: "", type: "bytes32" }],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
 ] as const;
 
 interface TextRecord {
@@ -57,9 +64,18 @@ type GateState =
   | { step: "verifying"; agent: string }
   | { step: "passed"; agent: string; ensName: string; records: TextRecord[] };
 
+function generateWallet(): { address: string; privateKey: string } {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  const privateKey = "0x" + Array.from(array).map((b) => b.toString(16).padStart(2, "0")).join("");
+  // We'll resolve the address server-side, but for now create a placeholder
+  return { address: "", privateKey };
+}
+
 export default function Home() {
   const [agent, setAgent] = useState("");
   const [agentLabel, setAgentLabel] = useState("");
+  const [generatedKey, setGeneratedKey] = useState("");
   const [tab, setTab] = useState<"check" | "register">("check");
   const [state, setState] = useState<GateState>({ step: "gate" });
   const [open, setOpen] = useState(false);
@@ -99,11 +115,46 @@ export default function Home() {
       .catch(() => setRpReady(true));
   }, [tab]);
 
+  async function resolveInput(input: string): Promise<string | null> {
+    // If it's already a hex address, return it
+    if (input.startsWith("0x") && input.length === 42) return input;
+
+    // Try to resolve as ENS name via our resolver
+    if (!resolverAddress) return null;
+    const client = createPublicClient({ chain: worldChain, transport: http() });
+
+    // Strip ".humanbacked.eth" suffix if present
+    let label = input.replace(/\.humanbacked\.eth$/i, "").toLowerCase();
+
+    try {
+      const { keccak256, toBytes } = await import("viem");
+      const labelhash = keccak256(toBytes(label));
+      // @ts-ignore
+      const resolved = await client.readContract({
+        address: resolverAddress,
+        abi: resolverAbi,
+        functionName: "names",
+        args: [labelhash],
+      });
+      if (resolved && resolved !== "0x0000000000000000000000000000000000000000") {
+        return resolved as string;
+      }
+    } catch {}
+    return null;
+  }
+
   async function checkGate() {
     if (!agent || !contractAddress) return;
     setState({ step: "checking" });
 
     try {
+      // Resolve ENS name or use address directly
+      const resolvedAgent = await resolveInput(agent);
+      if (!resolvedAgent) {
+        setState({ step: "blocked", agent });
+        return;
+      }
+
       const client = createPublicClient({ chain: worldChain, transport: http() });
 
       // @ts-ignore
@@ -111,13 +162,13 @@ export default function Home() {
         address: contractAddress,
         abi: gateAbi,
         functionName: "isVerified",
-        args: [agent as Address],
+        args: [resolvedAgent as Address],
       });
 
       if (verified) {
-        await fetchPassport(agent);
+        await fetchPassport(resolvedAgent);
       } else {
-        setState({ step: "blocked", agent });
+        setState({ step: "blocked", agent: resolvedAgent });
       }
     } catch {
       setState({ step: "blocked", agent });
@@ -436,22 +487,10 @@ export default function Home() {
             {tab === "register" && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-[10px] font-medium uppercase tracking-[0.15em] text-white/25 mb-1.5">Agent Address</label>
-                  <input
-                    type="text"
-                    placeholder="0x..."
-                    value={agent}
-                    onChange={(e) => setAgent(e.target.value)}
-                    disabled={state.step === "verifying"}
-                    className="input-field font-mono text-sm"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-[10px] font-medium uppercase tracking-[0.15em] text-white/25 mb-1.5">Agent Name</label>
                   <input
                     type="text"
-                    placeholder="mybot"
+                    placeholder="bob"
                     value={agentLabel}
                     onChange={(e) => setAgentLabel(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                     disabled={state.step === "verifying"}
@@ -459,6 +498,41 @@ export default function Home() {
                   />
                   {agentLabel && (
                     <p className="mt-1.5 text-[11px] text-accent/50">{agentLabel}.humanbacked.eth</p>
+                  )}
+                </div>
+
+                {/* Wallet: paste existing or auto-generate */}
+                <div>
+                  <label className="block text-[10px] font-medium uppercase tracking-[0.15em] text-white/25 mb-1.5">
+                    Agent Wallet <span className="text-white/15">(optional — we generate one)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="0x... or leave empty"
+                      value={agent}
+                      onChange={(e) => { setAgent(e.target.value); setGeneratedKey(""); }}
+                      disabled={state.step === "verifying"}
+                      className="input-field font-mono text-sm flex-1"
+                    />
+                    <button
+                      onClick={async () => {
+                        const res = await fetch("/api/generate-wallet", { method: "POST" });
+                        const data = await res.json();
+                        setAgent(data.address);
+                        setGeneratedKey(data.privateKey);
+                      }}
+                      disabled={state.step === "verifying"}
+                      className="btn-secondary px-3 py-2 text-[10px] shrink-0"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                  {generatedKey && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-amber-500/[0.06] border border-amber-500/20">
+                      <p className="text-[10px] text-amber-400 font-medium mb-1">Save this private key — shown only once</p>
+                      <p className="text-[10px] font-mono text-white/50 break-all select-all">{generatedKey}</p>
+                    </div>
                   )}
                 </div>
 
@@ -474,7 +548,7 @@ export default function Home() {
                   <>
                     <button
                       onClick={() => setOpen(true)}
-                      disabled={!agent}
+                      disabled={!agent || !agentLabel}
                       className="btn-primary w-full py-3.5 text-sm disabled:opacity-40"
                     >
                       <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5">
