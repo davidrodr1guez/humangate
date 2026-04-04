@@ -8,9 +8,9 @@
 <h1 align="center">HumanGate</h1>
 
 <p align="center">
-  <strong>The open standard for human-backed AI agents</strong>
+  <strong>The open verification layer for human-backed AI agents</strong>
   <br/>
-  <em>A shared on-chain whitelist that any service can query. Verify once. Agent forever.</em>
+  <em>A shared on-chain whitelist that any service can query. Verify once. Access everywhere.</em>
 </p>
 
 <p align="center">
@@ -522,13 +522,15 @@ This project was built during ETHGlobal Cannes 2026 (April 3-5) with the assista
 
 ## How HumanGate Compares
 
-| Approach | Verification | Per-interaction | Agent-friendly | Standard interface |
-|----------|-------------|-----------------|----------------|-------------------|
-| **CAPTCHA** | Solve puzzle | Every time | No | No |
-| **Gitcoin Passport** | Collect stamps (score ≥ 20) | Check score | No | No |
-| **Proof of Humanity** | Video + vouching | One-time | No | No |
-| **ALTCHA / PoW** | Compute puzzle | Every time | Partial | No |
-| **HumanGate** | World ID (1 scan) | **Never again** | **Yes** | **`isVerified()`** |
+| Approach | How you verify | Repeat per service? | Agents can use it? | Shared whitelist? |
+|----------|---------------|--------------------|--------------------|-------------------|
+| **CAPTCHA** | Solve puzzle | Yes, every time | No | No |
+| **Gitcoin Passport** | Collect stamps (score ≥ 20) | No, but need score check | No | Passport score API |
+| **Proof of Humanity** | Video + vouching | No | No | On-chain registry |
+| **World Agent Kit** | World ID delegation | Per x402 service | Yes (x402 only) | Agent Book |
+| **HumanGate** | World ID (1 scan) | **No — on-chain forever** | **Yes (any service)** | **`isVerified()` — universal** |
+
+> HumanGate complements World Agent Kit. Agent Kit handles x402 payments. HumanGate is the shared whitelist any service can query — faucets, DeFi, APIs, bounties — not just x402.
 
 ## Why a Standard?
 

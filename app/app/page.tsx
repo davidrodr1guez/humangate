@@ -146,11 +146,11 @@ export default function Home() {
           <h1 className="opacity-0 animate-fade-in-up fill-mode-forwards delay-100 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1]">
             <span className="text-white">Verify once.</span>
             <br />
-            <span className="text-gradient">Agent forever.</span>
+            <span className="text-gradient">Access everywhere.</span>
           </h1>
 
           <p className="opacity-0 animate-fade-in-up fill-mode-forwards delay-300 mt-6 text-base sm:text-lg text-white/40 max-w-lg mx-auto leading-relaxed">
-            The open standard for human-backed AI agents. One shared
+            The open verification layer for human-backed AI agents. One shared
             whitelist that any service, contract, or protocol can query.
           </p>
         </div>
