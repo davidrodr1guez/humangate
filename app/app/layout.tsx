@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MouseGlow } from "./mouse-glow";
+import { NavWrapper, ContentWrapper } from "./nav-wrapper";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -70,6 +71,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-surface-0 text-white antialiased noise-overlay">
+        <NavWrapper>
         {/* Navigation */}
         <nav className="fixed top-0 z-50 w-full border-b border-white/[0.04] bg-surface-0/80 backdrop-blur-xl">
           <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
@@ -112,10 +114,11 @@ export default function RootLayout({
             </div>
           </div>
         </nav>
+        </NavWrapper>
 
         <MouseGlow />
-        {/* Main content with top padding for fixed nav */}
-        <div className="pt-16">{children}</div>
+        {/* Main content */}
+        <ContentWrapper>{children}</ContentWrapper>
       </body>
     </html>
   );
