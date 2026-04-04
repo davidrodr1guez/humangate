@@ -209,7 +209,8 @@ export default function Home() {
   }
 
   async function handleVerify(result: any) {
-    setState({ step: "verifying", agent: state.step === "register" ? (state as any).agent : agent });
+    setOpen(false); // Close the IDKit widget immediately
+    setState({ step: "verifying", agent: agent });
 
     try {
       const response = result.responses?.[0] ?? result;
@@ -219,7 +220,7 @@ export default function Home() {
         proof: response.proof,
       };
 
-      const currentAgent = (state as any).agent || agent;
+      const currentAgent = agent;
 
       const res = await fetch("/api/verify", {
         method: "POST",
@@ -241,7 +242,7 @@ export default function Home() {
       // Fetch the passport data from chain
       await fetchPassport(currentAgent);
     } catch {
-      setState({ step: "blocked", agent: (state as any).agent || agent });
+      setState({ step: "blocked", agent });
     }
   }
 
