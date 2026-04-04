@@ -28,17 +28,44 @@ function waitForEnter(prompt: string): Promise<void> {
   return new Promise(resolve => { rl.question(prompt, () => { rl.close(); resolve(); }); });
 }
 
-async function tryFaucet(account: ReturnType<typeof privateKeyToAccount>): Promise<boolean> {
+async function tryFaucet(account: ReturnType<typeof privateKeyToAccount>): Promise<{ passed: boolean; result: any }> {
+  // Step 1: Request challenge
+  console.log(`  ${c.dim}  [1/3] Requesting challenge from faucet...${c.reset}`);
+  await sleep(800);
   const challengeRes = await fetch(`${GATEWAY}/api/challenge?agent=${account.address}`);
   const { nonce, message } = await challengeRes.json();
+  console.log(`  ${c.dim}        Faucet says: "Sign this to prove your identity"${c.reset}`);
+  console.log(`  ${c.dim}        Challenge:  ${c.cyan}${nonce.slice(0, 24)}...${c.reset}`);
+  await sleep(600);
+
+  // Step 2: Agent signs
+  console.log("");
+  console.log(`  ${c.dim}  [2/3] Agent signing challenge with private key...${c.reset}`);
+  await sleep(800);
   const signature = await account.signMessage({ message });
+  console.log(`  ${c.dim}        Signature:  ${c.green}${signature.slice(0, 24)}...${c.reset}`);
+  console.log(`  ${c.dim}        Wallet:     ${account.address}${c.reset}`);
+  await sleep(600);
+
+  // Step 3: Submit
+  console.log("");
+  console.log(`  ${c.dim}  [3/3] Submitting signed proof to faucet...${c.reset}`);
+  await sleep(800);
   const authRes = await fetch(`${GATEWAY}/api/challenge`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ agent: account.address, nonce, signature }),
   });
   const result = await authRes.json();
-  return result.authenticated && result.humanBacked;
+  await sleep(400);
+
+  // Show what the faucet checked
+  console.log("");
+  console.log(`  ${c.dim}        Faucet checks:${c.reset}`);
+  console.log(`  ${c.dim}        ${result.authenticated ? c.green + "✓" : c.red + "✗"} Signature valid? ${result.authenticated ? "YES — this IS wallet " + account.address.slice(0, 10) + "..." : "NO"}${c.reset}`);
+  console.log(`  ${c.dim}        ${result.humanBacked ? c.green + "✓" : c.red + "✗"} In HumanGate whitelist? ${result.humanBacked ? "YES — human-backed" : "NO — not verified"}${c.reset}`);
+
+  return { passed: result.authenticated && result.humanBacked, result };
 }
 
 async function main() {
@@ -72,14 +99,7 @@ async function main() {
   console.log(`  ${c.dim}─── Agent accessing faucet ───${c.reset}`);
   console.log("");
 
-  console.log(`  ${c.dim}  [1/3] Requesting access challenge...${c.reset}`);
-  await sleep(800);
-  console.log(`  ${c.dim}  [2/3] Signing with my wallet key...${c.reset}`);
-  await sleep(800);
-  console.log(`  ${c.dim}  [3/3] Submitting to faucet...${c.reset}`);
-  await sleep(1000);
-
-  const firstTry = await tryFaucet(account);
+  const { passed: firstTry } = await tryFaucet(account);
   console.log("");
 
   if (!firstTry) {
@@ -121,14 +141,7 @@ async function main() {
   console.log(`  ${c.dim}─── Agent accessing faucet (retry) ───${c.reset}`);
   console.log("");
 
-  console.log(`  ${c.dim}  [1/3] Requesting access challenge...${c.reset}`);
-  await sleep(800);
-  console.log(`  ${c.dim}  [2/3] Signing with my wallet key...${c.reset}`);
-  await sleep(800);
-  console.log(`  ${c.dim}  [3/3] Submitting to faucet...${c.reset}`);
-  await sleep(1000);
-
-  const secondTry = await tryFaucet(account);
+  const { passed: secondTry } = await tryFaucet(account);
   console.log("");
 
   if (secondTry) {
