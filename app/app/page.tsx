@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPublicClient, http, type Address } from "viem";
 import { IDKitRequestWidget, orbLegacy, type RpContext } from "@worldcoin/idkit";
 
@@ -31,6 +31,7 @@ type View =
 export default function Home() {
   const [view, setView] = useState<View>({ step: "captcha" });
   const [agent, setAgent] = useState("");
+  const agentRef = React.useRef("");
   const [agentLabel, setAgentLabel] = useState("");
   const [generatedKey, setGeneratedKey] = useState("");
   const [showWalletInput, setShowWalletInput] = useState(false);
@@ -42,6 +43,9 @@ export default function Home() {
   const contractAddress = process.env.NEXT_PUBLIC_HUMANGATE_CONTRACT as Address | undefined;
   const resolverAddress = process.env.NEXT_PUBLIC_RESOLVER_CONTRACT as Address | undefined;
   const appId = (process.env.NEXT_PUBLIC_APP_ID ?? "app_xxxxx") as `app_${string}`;
+
+  // Keep ref in sync
+  useEffect(() => { agentRef.current = agent; }, [agent]);
 
   useEffect(() => {
     if (view.step === "expand" && view.mode === "human") {
@@ -96,16 +100,22 @@ export default function Home() {
   }
 
   async function handleVerify(result: any) {
-    setOpen(false); setView({ step: "verifying" });
+    setOpen(false);
+    const currentAgent = agentRef.current;
+    console.log("handleVerify called, agent:", currentAgent);
+    if (!currentAgent) { console.error("No agent address"); setView({ step: "expand", mode: "human" }); return; }
+    setView({ step: "verifying" });
     try {
       const response = result.responses?.[0] ?? result;
       const res = await fetch("/api/verify", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proof: { merkle_root: response.merkle_root, nullifier_hash: response.nullifier_hash ?? response.nullifier, proof: response.proof }, agentId: agent, agentLabel: agentLabel || undefined, idkitPayload: result }),
+        body: JSON.stringify({ proof: { merkle_root: response.merkle_root, nullifier_hash: response.nullifier_hash ?? response.nullifier, proof: response.proof }, agentId: currentAgent, agentLabel: agentLabel || undefined, idkitPayload: result }),
       });
-      if (!res.ok) { setView({ step: "expand", mode: "human" }); return; }
-      const d = await fetchRecords(agent);
-      setView({ step: "passed", agent, ...d });
-    } catch { setView({ step: "expand", mode: "human" }); }
+      const data = await res.json();
+      console.log("Verify response:", res.status, data);
+      if (!res.ok) { alert("Verification error: " + (data.error || "Unknown")); setView({ step: "expand", mode: "human" }); return; }
+      const d = await fetchRecords(currentAgent);
+      setView({ step: "passed", agent: currentAgent, ...d });
+    } catch (err: any) { console.error("handleVerify error:", err); alert("Error: " + err.message); setView({ step: "expand", mode: "human" }); }
   }
 
   function formatTs(ts: string) { const n = parseInt(ts); return isNaN(n) ? ts : new Date(n * 1000).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
@@ -343,12 +353,13 @@ export default function Home() {
                 {rpReady ? (
                   <>
                     <button onClick={async () => {
-                      if (!agent) {
+                      if (!agentRef.current) {
                         const r = await fetch("/api/generate-wallet", { method: "POST" });
                         const d = await r.json();
                         setAgent(d.address);
+                        agentRef.current = d.address;
                         setGeneratedKey(d.privateKey);
-                        setTimeout(() => setOpen(true), 100);
+                        setTimeout(() => setOpen(true), 300);
                       } else {
                         setOpen(true);
                       }
