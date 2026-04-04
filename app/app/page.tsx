@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createPublicClient, http, type Address } from "viem";
 
@@ -31,13 +31,33 @@ const resolverAbi = [
     outputs: [{ name: "", type: "string" }],
     stateMutability: "view",
   },
+  {
+    type: "function",
+    name: "text",
+    inputs: [
+      { name: "agent", type: "address" },
+      { name: "key", type: "string" },
+    ],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
 ] as const;
+
+interface TextRecord {
+  key: string;
+  value: string;
+}
 
 type GateState =
   | { step: "gate" }
   | { step: "checking" }
   | { step: "blocked"; agent: string }
-  | { step: "passed"; agent: string; ensName: string };
+  | {
+      step: "passed";
+      agent: string;
+      ensName: string;
+      records: TextRecord[];
+    };
 
 export default function Home() {
   const [agent, setAgent] = useState("");
@@ -61,20 +81,55 @@ export default function Home() {
         args: [agent as Address],
       });
 
-      if (verified) {
+      if (verified && resolverAddress) {
+        // Fetch ENS name
         let ensName = "";
-        if (resolverAddress) {
+        try {
+          // @ts-ignore
+          ensName = await client.readContract({
+            address: resolverAddress,
+            abi: resolverAbi,
+            functionName: "ensNameOf",
+            args: [agent as Address],
+          });
+        } catch {}
+
+        // Fetch text records live from chain
+        const keys = [
+          "humangate.verified",
+          "humangate.verifiedAt",
+          "humangate.label",
+          "humangate.contract",
+          "humangate.chain",
+          "description",
+        ];
+        const records: TextRecord[] = [];
+        for (const key of keys) {
           try {
             // @ts-ignore
-            ensName = await client.readContract({
+            const value = await client.readContract({
               address: resolverAddress,
               abi: resolverAbi,
-              functionName: "ensNameOf",
-              args: [agent as Address],
+              functionName: "text",
+              args: [agent as Address, key],
             });
+            if (value) records.push({ key, value });
           } catch {}
         }
-        setState({ step: "passed", agent, ensName: ensName || `${agent.slice(2, 10).toLowerCase()}.humanbacked.eth` });
+
+        setState({
+          step: "passed",
+          agent,
+          ensName: ensName || agent.slice(0, 10) + ".humanbacked.eth",
+          records,
+        });
+      } else if (verified) {
+        setState({
+          step: "passed",
+          agent,
+          ensName: agent.slice(2, 10).toLowerCase() + ".humanbacked.eth",
+          records: [{ key: "humangate.verified", value: "true" }],
+        });
       } else {
         setState({ step: "blocked", agent });
       }
@@ -87,63 +142,173 @@ export default function Home() {
     if (e.key === "Enter" && agent) checkGate();
   }
 
-  // ── PASSED: Content unlocked ──
+  function formatTimestamp(ts: string): string {
+    const n = parseInt(ts);
+    if (isNaN(n)) return ts;
+    return new Date(n * 1000).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function truncAddr(a: string): string {
+    if (a.length <= 14) return a;
+    return a.slice(0, 6) + "..." + a.slice(-4);
+  }
+
+  // ── PASSED: Agent Passport ──
   if (state.step === "passed") {
+    const verifiedAt = state.records.find((r) => r.key === "humangate.verifiedAt")?.value;
+    const label = state.records.find((r) => r.key === "humangate.label")?.value;
+    const chain = state.records.find((r) => r.key === "humangate.chain")?.value;
+    const desc = state.records.find((r) => r.key === "description")?.value;
+
     return (
       <main className="relative min-h-screen">
-        <div className="absolute inset-0 grid-pattern opacity-20" />
-        <div className="relative z-10 flex flex-col items-center px-4 pt-12 pb-20">
-          {/* Verified banner */}
-          <div className="animate-fade-in mb-8">
-            <div className="badge-verified gap-2 px-5 py-2.5 text-sm">
-              <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
-                <path d="M8 1L2 4.5v3.5c0 3.7 2.56 7.16 6 8 3.44-.84 6-4.3 6-8V4.5L8 1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                <path d="M5.5 8l2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Human-backed agent verified
+        <div className="absolute inset-0 grid-pattern opacity-15" />
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-accent/[0.04] rounded-full blur-[120px]" />
+
+        <div className="relative z-10 flex flex-col items-center px-4 pt-8 sm:pt-12 pb-20">
+          {/* Passport Card */}
+          <div className="w-full max-w-md animate-scale-in">
+            <div className="pass-card glow-accent overflow-hidden">
+              {/* Top bar */}
+              <div className="h-1 w-full bg-gradient-to-r from-accent/0 via-accent to-accent/0" />
+
+              <div className="relative z-10 p-6 sm:p-8">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/15 border border-accent/20">
+                      <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6 text-accent-light">
+                        <path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                        <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-white">Agent Passport</p>
+                      <p className="text-[11px] text-accent-light/60">HumanGate Verified</p>
+                    </div>
+                  </div>
+                  <div className="badge-verified text-[10px] px-2.5 py-1">VERIFIED</div>
+                </div>
+
+                {/* Agent identity */}
+                <div className="mb-6">
+                  <p className="text-2xl font-bold text-white mb-1">
+                    {state.ensName || label + ".humanbacked.eth"}
+                  </p>
+                  <p className="text-xs font-mono text-white/30">{state.agent}</p>
+                </div>
+
+                {/* Divider with cutouts */}
+                <div className="relative my-5">
+                  <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-surface-0" />
+                  <div className="absolute -right-8 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-surface-0" />
+                  <div className="border-t border-dashed border-white/[0.08]" />
+                </div>
+
+                {/* On-chain records */}
+                <div className="space-y-3">
+                  <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20">
+                    On-Chain Records (live from World Chain)
+                  </p>
+
+                  {verifiedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-white/40">Verified</span>
+                      <span className="text-xs text-white/70">{formatTimestamp(verifiedAt)}</span>
+                    </div>
+                  )}
+
+                  {chain && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-white/40">Chain</span>
+                      <span className="text-xs text-white/70">World Chain ({chain})</span>
+                    </div>
+                  )}
+
+                  {label && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-white/40">ENS Name</span>
+                      <span className="text-xs text-accent">{label}.humanbacked.eth</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-white/40">Status</span>
+                    <span className="text-xs text-accent font-medium">Active</span>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {desc && (
+                  <div className="mt-4 p-3 rounded-lg bg-black/20 border border-white/[0.04]">
+                    <p className="text-[11px] text-white/40 italic">{desc}</p>
+                  </div>
+                )}
+
+                {/* Divider */}
+                <div className="relative my-5">
+                  <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-surface-0" />
+                  <div className="absolute -right-8 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-surface-0" />
+                  <div className="border-t border-dashed border-white/[0.08]" />
+                </div>
+
+                {/* Raw text records */}
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20 mb-3">
+                    ENS Text Records
+                  </p>
+                  <div className="space-y-1.5">
+                    {state.records.map((r) => (
+                      <div key={r.key} className="flex gap-2 text-[11px] font-mono">
+                        <span className="text-accent/50 shrink-0">{r.key}:</span>
+                        <span className="text-white/40 break-all">
+                          {r.key === "humangate.verifiedAt"
+                            ? formatTimestamp(r.value)
+                            : r.value.length > 30
+                              ? truncAddr(r.value)
+                              : r.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Contract link */}
+                <div className="mt-5 pt-4 border-t border-white/[0.04] flex items-center justify-between">
+                  <span className="text-[10px] text-white/15">HumanGate on World Chain</span>
+                  <span className="text-[10px] font-mono text-white/15">
+                    {contractAddress ? truncAddr(contractAddress) : ""}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="animate-fade-in-up text-center mb-10 max-w-lg">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-3">
-              Welcome, <span className="text-gradient">{state.ensName}</span>
-            </h1>
-            <p className="text-sm text-white/30 font-mono">{state.agent}</p>
-          </div>
+          {/* Actions below passport */}
+          <div className="w-full max-w-md mt-6 space-y-3 animate-fade-in-up delay-300 fill-mode-forwards opacity-0">
+            <p className="text-center text-xs text-white/20 mb-2">This agent passed the gate. No CAPTCHA needed.</p>
 
-          {/* Content cards */}
-          <div className="w-full max-w-md space-y-4 animate-fade-in-up delay-200 fill-mode-forwards opacity-0">
-            <div className="glass-card p-6 glow-accent-sm">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-lg font-semibold text-white">Token Faucet</span>
-                <span className="text-accent font-mono">0.1 ETH</span>
-              </div>
-              <p className="text-xs text-white/30 mb-4">Your agent passed the gate. No CAPTCHA needed.</p>
-              <button className="btn-primary w-full py-3 text-sm">Claim Tokens</button>
+            <div className="grid grid-cols-2 gap-3">
+              <Link href="/widget" className="btn-secondary py-3 text-xs justify-center">
+                Verify Another
+              </Link>
+              <Link href="/dashboard" className="btn-secondary py-3 text-xs justify-center">
+                Dashboard
+              </Link>
             </div>
 
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-lg font-semibold text-white">Bounty Board</span>
-                <span className="text-white/40 text-sm">3 active</span>
-              </div>
-              <p className="text-xs text-white/30 mb-4">Browse and claim bounties autonomously.</p>
-              <button className="btn-secondary w-full py-3 text-sm">Browse Bounties</button>
-            </div>
-
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-lg font-semibold text-white">Protected API</span>
-                <span className="text-white/40 text-sm">Unlimited</span>
-              </div>
-              <p className="text-xs text-white/30 mb-4">Access rate-limited data with your pass.</p>
-              <button className="btn-secondary w-full py-3 text-sm">Get API Key</button>
-            </div>
-          </div>
-
-          <div className="mt-10 flex gap-3">
-            <Link href="/dashboard" className="btn-secondary px-6 py-2.5 text-xs">Dashboard</Link>
-            <button onClick={() => setState({ step: "gate" })} className="btn-secondary px-6 py-2.5 text-xs">Check Another</button>
+            <button
+              onClick={() => setState({ step: "gate" })}
+              className="w-full text-center text-[11px] text-white/20 hover:text-white/40 transition-colors py-2"
+            >
+              Check another agent
+            </button>
           </div>
         </div>
       </main>
