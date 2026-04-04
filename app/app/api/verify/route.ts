@@ -31,7 +31,10 @@ const resolverAbi = [
   {
     type: "function",
     name: "registerAgent",
-    inputs: [{ name: "agent", type: "address" }],
+    inputs: [
+      { name: "agent", type: "address" },
+      { name: "label", type: "string" },
+    ],
     outputs: [],
     stateMutability: "nonpayable",
   },
@@ -60,7 +63,7 @@ function getPassDomain(contractAddress: Hex) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { proof, agentId, idkitPayload } = body;
+    const { proof, agentId, idkitPayload, agentLabel } = body;
 
     if (!agentId) {
       return NextResponse.json(
@@ -152,7 +155,8 @@ export async function POST(request: Request) {
     console.log("Agent registered on-chain:", txHash);
 
     // ---------- Step 3: Register ENS subname ----------
-    let ensName: string | null = `${(agentId as string).toLowerCase()}.humanbacked.eth`;
+    const label = agentLabel || (agentId as string).slice(2, 10).toLowerCase();
+    let ensName: string | null = `${label}.humanbacked.eth`;
     if (resolverAddress) {
       try {
         // @ts-ignore
@@ -162,10 +166,10 @@ export async function POST(request: Request) {
           address: resolverAddress,
           abi: resolverAbi,
           functionName: "registerAgent",
-          args: [agentId as Hex],
+          args: [agentId as Hex, label],
         });
         await pub.waitForTransactionReceipt({ hash: ensTx });
-        console.log("ENS registered:", ensTx);
+        console.log("ENS registered:", label + ".humanbacked.eth", ensTx);
       } catch (err) {
         console.warn("ENS registration failed (non-fatal):", err);
       }

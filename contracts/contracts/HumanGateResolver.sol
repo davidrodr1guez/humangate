@@ -2,10 +2,9 @@
 pragma solidity ^0.8.24;
 
 /// @title HumanGateResolver — ENSIP-10 wildcard resolver for verified agents
-/// @notice Resolves {address}.humanbacked.eth → agent address + text records,
+/// @notice Resolves human-readable names like mybot.humanbacked.eth → agent address,
 ///         but ONLY if the agent has passed HumanGate verification.
-///         Implements the verification loop described in ENSIP-25:
-///         agent ↔ ENS name bidirectional attestation.
+///         Implements ENSIP-25 verification loop: agent ↔ ENS name bidirectional attestation.
 
 interface IHumanGate {
     function isVerified(address agent) external view returns (bool);
@@ -14,8 +13,11 @@ interface IHumanGate {
 contract HumanGateResolver {
     IHumanGate public immutable gate;
 
-    /// @dev labelhash → agent address (set when agent registers after verification)
+    /// @dev labelhash → agent address
     mapping(bytes32 => address) public names;
+
+    /// @dev agent → chosen label (e.g. "mybot")
+    mapping(address => string) public labels;
 
     /// @dev agent → registration timestamp
     mapping(address => uint256) public verifiedAt;
@@ -23,22 +25,30 @@ contract HumanGateResolver {
     /// @dev agent → custom text records (key → value)
     mapping(address => mapping(string => string)) private _textRecords;
 
-    event AgentNameRegistered(address indexed agent, string ensName, uint256 timestamp);
+    event AgentNameRegistered(address indexed agent, string label, string ensName, uint256 timestamp);
     event TextRecordSet(address indexed agent, string key, string value);
+
+    error LabelTaken();
+    error EmptyLabel();
 
     constructor(IHumanGate _gate) {
         gate = _gate;
     }
 
-    /// @notice Called after HumanGate verification to assign an ENS identity
-    ///         and populate default text records.
-    function registerAgent(address agent) external {
+    /// @notice Register a human-readable ENS name for a verified agent.
+    ///         e.g. registerAgent(0x1234..., "mybot") → mybot.humanbacked.eth
+    function registerAgent(address agent, string calldata label) external {
         require(gate.isVerified(agent), "Agent not verified");
+        if (bytes(label).length == 0) revert EmptyLabel();
 
-        string memory label = _addressToHexString(agent);
         bytes32 labelhash = keccak256(bytes(label));
+        if (names[labelhash] != address(0)) revert LabelTaken();
+
         names[labelhash] = agent;
+        labels[agent] = label;
         verifiedAt[agent] = block.timestamp;
+
+        string memory ensName = string.concat(label, ".humanbacked.eth");
 
         // Default text records — attestation metadata
         _textRecords[agent]["humangate.verified"] = "true";
@@ -46,41 +56,43 @@ contract HumanGateResolver {
         _textRecords[agent]["humangate.contract"] = _addressToHexString(address(gate));
         _textRecords[agent]["humangate.resolver"] = _addressToHexString(address(this));
         _textRecords[agent]["humangate.chain"] = "480";
+        _textRecords[agent]["humangate.label"] = label;
         _textRecords[agent]["description"] = string.concat(
-            "Human-backed AI agent verified via HumanGate + World ID on World Chain"
+            "Human-backed AI agent '", label, "' verified via HumanGate + World ID"
         );
 
-        emit AgentNameRegistered(
-            agent,
-            string.concat(label, ".humanbacked.eth"),
-            block.timestamp
-        );
+        emit AgentNameRegistered(agent, label, ensName, block.timestamp);
     }
 
-    /// @notice Let a verified agent (or anyone) set additional text records
+    /// @notice Let a verified agent set additional text records
     function setText(address agent, string calldata key, string calldata value) external {
         require(gate.isVerified(agent), "Agent not verified");
-        require(names[_labelhashOf(agent)] != address(0), "Agent not registered");
+        require(bytes(labels[agent]).length > 0, "Agent not registered");
         _textRecords[agent][key] = value;
         emit TextRecordSet(agent, key, value);
     }
 
     /// @notice Read a text record for a registered agent
     function text(address agent, string calldata key) external view returns (string memory) {
-        require(names[_labelhashOf(agent)] != address(0), "Agent not registered");
+        require(bytes(labels[agent]).length > 0, "Agent not registered");
         return _textRecords[agent][key];
+    }
+
+    /// @notice Get the full ENS name for an agent
+    function ensNameOf(address agent) external view returns (string memory) {
+        string memory label = labels[agent];
+        if (bytes(label).length == 0) return "";
+        return string.concat(label, ".humanbacked.eth");
     }
 
     // ---- ENSIP-10: wildcard resolution ----
 
     /// @notice Resolves a subname of humanbacked.eth to address or text records.
-    ///         DNS-encoded name arrives as: [labelLen][label][11]humanbacked[3]eth[0]
     function resolve(bytes calldata name, bytes calldata data)
         external
         view
         returns (bytes memory)
     {
-        // Extract first label from DNS-encoded name
         uint8 labelLen = uint8(name[0]);
         bytes32 labelhash = keccak256(name[1:1 + labelLen]);
 
@@ -113,10 +125,6 @@ contract HumanGateResolver {
     }
 
     // ---- internal helpers ----
-
-    function _labelhashOf(address agent) internal pure returns (bytes32) {
-        return keccak256(bytes(_addressToHexString(agent)));
-    }
 
     function _addressToHexString(address addr) internal pure returns (string memory) {
         bytes16 alphabet = "0123456789abcdef";

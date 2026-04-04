@@ -319,6 +319,7 @@ function PassCard({
 
 export default function WidgetPage() {
   const [agentId, setAgentId] = useState("");
+  const [agentLabel, setAgentLabel] = useState("");
   const [status, setStatus] = useState<Status>({ step: "idle" });
   const [open, setOpen] = useState(false);
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
@@ -382,6 +383,7 @@ export default function WidgetPage() {
         body: JSON.stringify({
           proof,
           agentId,
+          agentLabel: agentLabel || undefined,
           idkitPayload: result,
         }),
       });
@@ -485,6 +487,42 @@ export default function WidgetPage() {
                   </div>
                   <p className="mt-1.5 text-[11px] text-white/15">
                     The Ethereum address of the AI agent to verify
+                  </p>
+                </div>
+
+                {/* Agent name */}
+                <div>
+                  <label
+                    htmlFor="agentLabel"
+                    className="block text-[11px] font-medium uppercase tracking-[0.15em] text-white/30 mb-2"
+                  >
+                    Agent Name
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/15">
+                      <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                        <path
+                          d="M8 1L2 4.5v3.5c0 3.7 2.56 7.16 6 8 3.44-.84 6-4.3 6-8V4.5L8 1z"
+                          stroke="currentColor"
+                          strokeWidth="1.2"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <input
+                      id="agentLabel"
+                      type="text"
+                      placeholder="mybot"
+                      value={agentLabel}
+                      onChange={(e) => setAgentLabel(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                      className="input-field pl-10 text-sm"
+                      disabled={status.step === "verifying"}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-white/15">
+                    {agentLabel
+                      ? <span className="text-accent/50">{agentLabel}.humanbacked.eth</span>
+                      : "Choose a human-readable name for your agent"}
                   </p>
                 </div>
 

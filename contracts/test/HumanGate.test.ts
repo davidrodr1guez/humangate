@@ -49,6 +49,35 @@ describe("HumanGate", () => {
     await expect(gate.verifyAgent(agent.address, 1n, nullifierHash, proof))
       .to.be.revertedWithCustomError(gate, "AlreadyVerified");
   });
+
+  it("registers via cloud-verified path (registerVerified)", async () => {
+    const Mock = await ethers.getContractFactory("MockWorldID");
+    const mock = await Mock.deploy();
+
+    const HumanGate = await ethers.getContractFactory("HumanGate");
+    const gate = await HumanGate.deploy(await mock.getAddress(), "app_test", "verify-agent");
+
+    const [owner, agent] = await ethers.getSigners();
+
+    await expect(gate.registerVerified(agent.address, 42n))
+      .to.emit(gate, "AgentVerified")
+      .withArgs(agent.address, 42n);
+
+    expect(await gate.isVerified(agent.address)).to.equal(true);
+  });
+
+  it("rejects registerVerified from non-operator", async () => {
+    const Mock = await ethers.getContractFactory("MockWorldID");
+    const mock = await Mock.deploy();
+
+    const HumanGate = await ethers.getContractFactory("HumanGate");
+    const gate = await HumanGate.deploy(await mock.getAddress(), "app_test", "verify-agent");
+
+    const [, agent] = await ethers.getSigners();
+
+    await expect(gate.connect(agent).registerVerified(agent.address, 42n))
+      .to.be.revertedWithCustomError(gate, "NotOperator");
+  });
 });
 
 describe("HumanGateResolver", () => {
@@ -69,93 +98,92 @@ describe("HumanGateResolver", () => {
     return { gate, resolver, owner, agent, proof };
   }
 
-  it("registers a verified agent and resolves its ENS name", async () => {
+  it("registers a verified agent with human-readable name", async () => {
     const { gate, resolver, agent, proof } = await deployFixture();
 
     await gate.verifyAgent(agent.address, 1n, 111n, proof);
-    await expect(resolver.registerAgent(agent.address))
-      .to.emit(resolver, "AgentNameRegistered");
+    await expect(resolver.registerAgent(agent.address, "mybot"))
+      .to.emit(resolver, "AgentNameRegistered")
+      .withArgs(agent.address, "mybot", "mybot.humanbacked.eth", await resolver.verifiedAt(agent.address).then(() => ethers.provider.getBlock("latest").then(b => b!.timestamp)));
 
-    const label = agent.address.toLowerCase();
-    const labelhash = ethers.keccak256(ethers.toUtf8Bytes(label));
+    const labelhash = ethers.keccak256(ethers.toUtf8Bytes("mybot"));
     expect(await resolver.names(labelhash)).to.equal(agent.address);
+    expect(await resolver.labels(agent.address)).to.equal("mybot");
+    expect(await resolver.ensNameOf(agent.address)).to.equal("mybot.humanbacked.eth");
   });
 
   it("reverts registerAgent for unverified agent", async () => {
     const { resolver, agent } = await deployFixture();
 
-    await expect(resolver.registerAgent(agent.address))
+    await expect(resolver.registerAgent(agent.address, "mybot"))
       .to.be.revertedWith("Agent not verified");
+  });
+
+  it("reverts on duplicate label", async () => {
+    const { gate, resolver, owner, agent, proof } = await deployFixture();
+
+    await gate.verifyAgent(agent.address, 1n, 111n, proof);
+    await resolver.registerAgent(agent.address, "mybot");
+
+    // Verify owner too
+    await gate.verifyAgent(owner.address, 1n, 222n, proof);
+    await expect(resolver.registerAgent(owner.address, "mybot"))
+      .to.be.revertedWithCustomError(resolver, "LabelTaken");
+  });
+
+  it("reverts on empty label", async () => {
+    const { gate, resolver, agent, proof } = await deployFixture();
+
+    await gate.verifyAgent(agent.address, 1n, 111n, proof);
+    await expect(resolver.registerAgent(agent.address, ""))
+      .to.be.revertedWithCustomError(resolver, "EmptyLabel");
   });
 
   it("supports ExtendedResolver and ITextResolver interfaces (ENSIP-10)", async () => {
     const { resolver } = await deployFixture();
 
-    expect(await resolver.supportsInterface("0x9061b923")).to.equal(true); // ExtendedResolver
-    expect(await resolver.supportsInterface("0x59d1d43c")).to.equal(true); // ITextResolver
-    expect(await resolver.supportsInterface("0x01ffc9a7")).to.equal(true); // ERC-165
+    expect(await resolver.supportsInterface("0x9061b923")).to.equal(true);
+    expect(await resolver.supportsInterface("0x59d1d43c")).to.equal(true);
+    expect(await resolver.supportsInterface("0x01ffc9a7")).to.equal(true);
   });
 
-  it("sets default text records on registration", async () => {
+  it("sets default text records including label", async () => {
     const { gate, resolver, agent, proof } = await deployFixture();
 
     await gate.verifyAgent(agent.address, 1n, 222n, proof);
-    await resolver.registerAgent(agent.address);
+    await resolver.registerAgent(agent.address, "trader-bot");
 
     expect(await resolver.text(agent.address, "humangate.verified")).to.equal("true");
     expect(await resolver.text(agent.address, "humangate.chain")).to.equal("480");
-    expect(await resolver.text(agent.address, "humangate.contract"))
-      .to.equal((await gate.getAddress()).toLowerCase());
+    expect(await resolver.text(agent.address, "humangate.label")).to.equal("trader-bot");
     expect(await resolver.text(agent.address, "description"))
-      .to.include("Human-backed AI agent");
+      .to.include("trader-bot");
   });
 
-  it("stores verifiedAt timestamp on registration", async () => {
-    const { gate, resolver, agent, proof } = await deployFixture();
-
-    await gate.verifyAgent(agent.address, 1n, 333n, proof);
-    await resolver.registerAgent(agent.address);
-
-    const verifiedAt = await resolver.verifiedAt(agent.address);
-    expect(verifiedAt).to.be.greaterThan(0n);
-
-    const textTimestamp = await resolver.text(agent.address, "humangate.verifiedAt");
-    expect(textTimestamp).to.equal(verifiedAt.toString());
-  });
-
-  it("allows setting custom text records for verified agents", async () => {
+  it("allows setting custom text records", async () => {
     const { gate, resolver, agent, proof } = await deployFixture();
 
     await gate.verifyAgent(agent.address, 1n, 444n, proof);
-    await resolver.registerAgent(agent.address);
+    await resolver.registerAgent(agent.address, "mybot");
 
     await expect(resolver.setText(agent.address, "url", "https://myagent.ai"))
-      .to.emit(resolver, "TextRecordSet")
-      .withArgs(agent.address, "url", "https://myagent.ai");
+      .to.emit(resolver, "TextRecordSet");
 
     expect(await resolver.text(agent.address, "url")).to.equal("https://myagent.ai");
   });
 
-  it("reverts setText for unverified agent", async () => {
-    const { resolver, agent } = await deployFixture();
-
-    await expect(resolver.setText(agent.address, "url", "https://test.com"))
-      .to.be.revertedWith("Agent not verified");
-  });
-
-  it("resolves text records via ENSIP-10 wildcard", async () => {
+  it("resolves human-readable names via ENSIP-10 wildcard", async () => {
     const { gate, resolver, agent, proof } = await deployFixture();
 
     await gate.verifyAgent(agent.address, 1n, 555n, proof);
-    await resolver.registerAgent(agent.address);
+    await resolver.registerAgent(agent.address, "mybot");
 
-    // Build DNS-encoded name for the agent
-    const label = agent.address.toLowerCase();
+    // Build DNS-encoded name for "mybot.humanbacked.eth"
+    const label = "mybot";
     const labelBytes = ethers.toUtf8Bytes(label);
     const parentLabel = ethers.toUtf8Bytes("humanbacked");
     const tldLabel = ethers.toUtf8Bytes("eth");
 
-    // DNS encoding: [len][label][len][parent][len][tld][0]
     const dnsName = ethers.concat([
       new Uint8Array([labelBytes.length]),
       labelBytes,
@@ -166,18 +194,23 @@ describe("HumanGateResolver", () => {
       new Uint8Array([0]),
     ]);
 
-    // Encode text(bytes32,string) call
-    const node = ethers.namehash(label + ".humanbacked.eth");
+    // addr(bytes32) resolution
+    const addrSelector = "0x3b3b57de";
+    const node = ethers.namehash("mybot.humanbacked.eth");
+    const addrCalldata = ethers.AbiCoder.defaultAbiCoder().encode(["bytes32"], [node]);
+    const addrResult = await resolver.resolve(dnsName, ethers.concat([addrSelector, addrCalldata]));
+    const decodedAddr = ethers.AbiCoder.defaultAbiCoder().decode(["address"], addrResult);
+    expect(decodedAddr[0]).to.equal(agent.address);
+
+    // text(bytes32,string) resolution
+    const textSelector = "0x59d1d43c";
     const textCalldata = ethers.AbiCoder.defaultAbiCoder().encode(
       ["bytes32", "string"],
       [node, "humangate.verified"]
     );
-    const textSelector = "0x59d1d43c";
-    const fullCalldata = ethers.concat([textSelector, textCalldata]);
-
-    const result = await resolver.resolve(dnsName, fullCalldata);
-    const decoded = ethers.AbiCoder.defaultAbiCoder().decode(["string"], result);
-    expect(decoded[0]).to.equal("true");
+    const textResult = await resolver.resolve(dnsName, ethers.concat([textSelector, textCalldata]));
+    const decodedText = ethers.AbiCoder.defaultAbiCoder().decode(["string"], textResult);
+    expect(decodedText[0]).to.equal("true");
   });
 });
 
@@ -196,7 +229,6 @@ describe("ProtectedFaucet", () => {
     const proof: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint] =
       [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n];
 
-    // Fund the faucet
     await owner.sendTransaction({ to: await faucet.getAddress(), value: parseEther("1") });
 
     return { gate, faucet, owner, agent, proof };

@@ -105,6 +105,32 @@ const { valid } = await verifyPass(agentPass, contractAddress);
 const verified = await isAgentVerified(contractAddress, agentAddress);
 ```
 
+## The Flywheel
+
+HumanGate grows the same way Stripe did — a two-sided network effect:
+
+```
+  More services integrate HumanGate (1 line: isVerified())
+      │
+      ▼
+  More agents NEED to verify to access those services
+      │
+      ▼
+  More humans verify their agents (2 txs on World Chain each)
+      │
+      ▼
+  The shared whitelist grows — more verified agents
+      │
+      ▼
+  More valuable for NEW services to integrate (bigger whitelist = more users)
+      │
+      └──────────────── back to top ────────────────┘
+```
+
+Each side feeds the other. If every service builds its own whitelist, there's no network effect. With one shared whitelist, there is.
+
+**Every verification = 2 transactions on World Chain.** The protocol generates organic on-chain activity that scales with adoption.
+
 ## How It Works
 
 ```
