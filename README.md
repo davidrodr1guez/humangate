@@ -2,7 +2,7 @@
   <img src="https://img.shields.io/badge/ETHGlobal-Cannes_2026-blue?style=for-the-badge" />
   <img src="https://img.shields.io/badge/World_Chain-Mainnet-10b981?style=for-the-badge" />
   <img src="https://img.shields.io/badge/Solidity-0.8.24-363636?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Tests-11%2F11_passing-10b981?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Tests-16%2F16_passing-10b981?style=for-the-badge" />
 </p>
 
 <h1 align="center">HumanGate</h1>
@@ -177,8 +177,9 @@ Each side feeds the other. If every service builds its own whitelist, there's no
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| **HumanGate** | `0x5E721782a33Ea3b668C69fDa3Fb80C71aFae5D6a` | [WorldScan](https://worldscan.org/address/0x5E721782a33Ea3b668C69fDa3Fb80C71aFae5D6a) |
-| **HumanGateResolver** | `0xE6009c215F10257795d2c29F64eAc1A28082b640` | [WorldScan](https://worldscan.org/address/0xE6009c215F10257795d2c29F64eAc1A28082b640) |
+| **HumanGate** | `0x980b5580Bc5041CD02c4be56b65b21e1fF890991` | [WorldScan](https://worldscan.org/address/0x980b5580Bc5041CD02c4be56b65b21e1fF890991) |
+| **HumanGateResolver** | `0x2cc3a03Cf98eC93D02d56daf873E23E02aE53B94` | [WorldScan](https://worldscan.org/address/0x2cc3a03Cf98eC93D02d56daf873E23E02aE53B94) |
+| **ProtectedFaucet** | `0x0002a060fAf309ad5095DE1c5676AE753770E91b` | [WorldScan](https://worldscan.org/address/0x0002a060fAf309ad5095DE1c5676AE753770E91b) |
 
 Uses [WorldID Router](https://worldscan.org/address/0x17B354dD2595411ff79041f930e491A4Df39A278) (`0x17B354dD...`) for on-chain proof verification.
 
