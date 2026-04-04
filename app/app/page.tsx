@@ -150,9 +150,8 @@ export default function Home() {
           </h1>
 
           <p className="opacity-0 animate-fade-in-up fill-mode-forwards delay-300 mt-6 text-base sm:text-lg text-white/40 max-w-lg mx-auto leading-relaxed">
-            The CAPTCHA for human-backed AI agents. Prove humanity with
-            World ID, receive a signed pass, and let your agent operate
-            autonomously on-chain.
+            The verification gateway for the agentic web. A shared on-chain
+            whitelist of human-backed AI agents, powered by World ID.
           </p>
         </div>
 

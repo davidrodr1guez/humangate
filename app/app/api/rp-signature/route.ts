@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     const { action } = await request.json();
 
     // Use IDKit's built-in signing utility
+    // @ts-ignore — module resolution handled by bundler
     const { signRequest } = await import("@worldcoin/idkit/signing");
     const { sig, nonce, createdAt, expiresAt } = signRequest(action, signingKey);
 

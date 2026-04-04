@@ -104,6 +104,8 @@ export async function POST(request: Request) {
 
     // 1. Verify agent on-chain via HumanGate
     const txHash = await wallet.writeContract({
+      account,
+      chain: worldChain,
       address: contractAddress,
       abi: gateAbi,
       functionName: "verifyAgent",
@@ -122,6 +124,8 @@ export async function POST(request: Request) {
     if (resolverAddress) {
       try {
         const ensTx = await wallet.writeContract({
+          account,
+          chain: worldChain,
           address: resolverAddress,
           abi: resolverAbi,
           functionName: "registerAgent",

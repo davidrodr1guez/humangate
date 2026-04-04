@@ -8,9 +8,9 @@
 <h1 align="center">HumanGate</h1>
 
 <p align="center">
-  <strong>The attestation layer for human-backed AI agents</strong>
+  <strong>The verification gateway for the agentic web</strong>
   <br/>
-  <em>Verify once. Agent forever.</em>
+  <em>A shared on-chain whitelist of human-backed AI agents. Verify once. Agent forever.</em>
 </p>
 
 <p align="center">
@@ -27,20 +27,36 @@
 
 ## Problem
 
-75%+ of internet traffic is bots. CAPTCHAs block all agents equally — including legitimate ones acting on behalf of real people. There is no way to distinguish a human-backed agent from a malicious bot.
+75%+ of internet traffic is bots. Services have two bad options: block all agents (losing legitimate traffic) or allow everything (getting gamed by bots). There is no shared way to distinguish a human-backed agent from a malicious bot.
 
-Today, if your AI agent tries to claim faucet tokens, interact with a dapp, or access any protected service, it gets blocked. The human has to intervene manually every time. That defeats the purpose of having an agent.
+Every service maintains its own auth — CAPTCHAs, API keys, rate limits. None of them answer the real question: *"Is there a real human behind this agent?"*
 
 ## Solution
 
-HumanGate replaces the per-interaction CAPTCHA challenge with a **one-time verification + portable credential** model.
+HumanGate is a **verification gateway** — a shared on-chain whitelist of human-backed AI agents, powered by World ID.
 
-> CAPTCHA asks: *"Prove you're human — NOW."*
-> HumanGate asks: *"Prove your agent was verified — ONCE."*
+```
+                    ┌──────────────────────┐
+   Agents           │    HumanGate         │        Services
+   (bots +          │    Gateway           │        (faucets, dapps,
+    human-backed)   │                      │         APIs, etc.)
+        ───────────>│  on-chain whitelist   │───────────>
+                    │  + EIP-712 passes    │
+                    │                      │
+                    │  ✓ human-backed      │──> ACCESS
+                    │  ✗ not verified      │──> BLOCKED
+                    └──────────────────────┘
+```
 
-The analogy: **CAPTCHA is a bouncer who asks you to solve a puzzle every time you enter the club. HumanGate is the bouncer who checks your wristband.**
+**How it works:**
 
-The human owner verifies once with World ID. The agent receives an on-chain registration, an ENS identity, and a signed EIP-712 pass. From that point on, the agent operates autonomously — presenting its credential at any HumanGate-protected service without the human ever intervening again.
+1. A human verifies **once** with World ID (ZK proof, Orb level)
+2. The agent's address gets **whitelisted on-chain** (`verifiedAgents[address] = true`)
+3. The agent receives an **ENS identity** (`{address}.humanbacked.eth`) and an **EIP-712 signed pass**
+4. Any service checks the whitelist — on-chain (`isVerified()`) or off-chain (`verifyPass()`, pure ecrecover, 1ms, no gas)
+5. The agent passes the gateway **autonomously, forever** — the human never intervenes again
+
+> Think of it as a **shared API gateway for the agentic web**, but instead of API keys, it uses proof-of-humanity. Every service behind the gateway inherits the same trust layer — no need for each service to build its own bot detection.
 
 ## How It Works
 
@@ -407,9 +423,9 @@ Verify an EIP-712 pass. No gas, no RPC — pure signature verification.
 
 ## Key Insight
 
-> A CAPTCHA is challenge-response: solve a puzzle NOW, every time.
-> HumanGate is credential-based: prove you WERE verified, once.
-> The human verifies. The agent operates. Forever.
+> Every service shouldn't have to build its own bot detection.
+> HumanGate is a **shared whitelist** — verify once, access everywhere.
+> The human signs. The agent operates. The gateway protects.
 
 ---
 

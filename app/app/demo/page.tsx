@@ -46,6 +46,7 @@ export default function DemoPage() {
         transport: http(),
       });
 
+      // @ts-ignore viem type compat
       const verified = await client.readContract({
         address: contractAddress,
         abi: gateAbi,

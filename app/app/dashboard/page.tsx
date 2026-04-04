@@ -92,6 +92,7 @@ export default function DashboardPage() {
         transport: http(),
       });
 
+      // @ts-ignore viem type compat
       const verified = await client.readContract({
         address: contractAddress,
         abi: gateAbi,
@@ -110,6 +111,7 @@ export default function DashboardPage() {
             const { keccak256, toBytes } = await import("viem");
             const label = agent.toLowerCase();
             const labelhash = keccak256(toBytes(label));
+            // @ts-ignore viem type compat
             const registered = await client.readContract({
               address: resolverAddress,
               abi: resolverAbi,
