@@ -14,11 +14,11 @@
 </p>
 
 <p align="center">
+  <a href="https://humangate-lake.vercel.app"><strong>Live Demo</strong></a> &bull;
   <a href="#problem">Problem</a> &bull;
   <a href="#solution">Solution</a> &bull;
   <a href="#how-it-works">How It Works</a> &bull;
   <a href="#deployed-contracts">Contracts</a> &bull;
-  <a href="#demo">Demo</a> &bull;
   <a href="#tracks">Tracks</a> &bull;
   <a href="#getting-started">Getting Started</a>
 </p>
