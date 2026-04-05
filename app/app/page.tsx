@@ -72,7 +72,7 @@ export default function Home() {
     } catch {} return null;
   }
 
-  async function fetchRecords(addr: string): Promise<{ ensName: string; records: TextRecord[] }> {
+  async function fetchRecordsOnce(addr: string): Promise<{ ensName: string; records: TextRecord[] }> {
     const client = createPublicClient({ chain: worldChain, transport: http() });
     let ensName = ""; const records: TextRecord[] = [];
     if (!resolverAddress) return { ensName: addr.slice(2, 10) + ".humanbacked.eth", records: [{ key: "humangate.verified", value: "true" }] };
@@ -85,13 +85,24 @@ export default function Home() {
         if (val) records.push({ key, value: val });
       } catch {}
     }
-    // Fallback: always show basic verified info even if resolver has no records
-    if (records.length === 0) {
-      records.push({ key: "humangate.verified", value: "true" });
-      records.push({ key: "humangate.contract", value: contractAddress ?? "" });
-      records.push({ key: "humangate.chain", value: "480" });
-    }
     return { ensName: ensName || addr.slice(2, 10) + ".humanbacked.eth", records };
+  }
+
+  async function fetchRecords(addr: string): Promise<{ ensName: string; records: TextRecord[] }> {
+    // First attempt
+    let result = await fetchRecordsOnce(addr);
+    // If resolver has no records yet (tx may still be confirming), retry after delay
+    if (result.records.length === 0) {
+      await new Promise(r => setTimeout(r, 4000));
+      result = await fetchRecordsOnce(addr);
+    }
+    // Final fallback
+    if (result.records.length === 0) {
+      result.records.push({ key: "humangate.verified", value: "true" });
+      result.records.push({ key: "humangate.contract", value: contractAddress ?? "" });
+      result.records.push({ key: "humangate.chain", value: "480" });
+    }
+    return result;
   }
 
   async function checkAgent() {
