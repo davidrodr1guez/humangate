@@ -186,8 +186,10 @@ export async function POST(request: Request) {
       } catch (txErr: any) {
         const msg = txErr?.message ?? "";
         if (msg.includes("AlreadyVerified") || msg.includes("0x118fd7b8")) {
-          alreadyOnChain = true;
-          console.log("Nullifier already used, proceeding to ENS registration");
+          return NextResponse.json(
+            { error: "This World ID proof was already used. Each person can only verify one agent.", code: "ALREADY_VERIFIED" },
+            { status: 409 }
+          );
         } else if (msg.includes("NotOperator") || msg.includes("0x7c214f04")) {
           return NextResponse.json(
             { error: "Server operator mismatch. Please contact support.", code: "NOT_OPERATOR" },
