@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPublicClient, http, type Address } from "viem";
-import { IDKitRequestWidget, deviceLegacy, type RpContext } from "@worldcoin/idkit";
+import { IDKitRequestWidget, orbLegacy, type RpContext } from "@worldcoin/idkit";
 
 const worldChain = {
   id: 480,
@@ -482,7 +482,7 @@ export default function Home() {
                     {agent && (
                       <IDKitRequestWidget open={open} onOpenChange={setOpen} app_id={appId} action="verify-agent-v9"
                         rp_context={rpContext ?? { rp_id: "", nonce: "", created_at: 0, expires_at: 0, signature: "" }}
-                        allow_legacy_proofs preset={deviceLegacy({ signal: agent })} environment="production"
+                        allow_legacy_proofs preset={orbLegacy({ signal: agent })} environment="production"
                         handleVerify={handleVerify} onSuccess={() => {}} onError={() => {}} />
                     )}
                   </>
