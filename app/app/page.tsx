@@ -36,6 +36,7 @@ export default function Home() {
   const [generatedKey, setGeneratedKey] = useState("");
   const [showWalletInput, setShowWalletInput] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [passportTab, setPassportTab] = useState<"passport" | "services" | "credentials">("passport");
   const [open, setOpen] = useState(false);
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
   const [rpReady, setRpReady] = useState(false);
@@ -133,7 +134,9 @@ export default function Home() {
           <div className="rounded-lg overflow-hidden" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
             {/* Green verified bar */}
             <div className="h-1.5 bg-emerald-500" />
-            <div className="p-6">
+
+            {/* Header — always visible */}
+            <div className="p-6 pb-0">
               <div className="flex items-center gap-3 mb-5">
                 <div className="h-10 w-10 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6 text-white"><path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -143,112 +146,120 @@ export default function Home() {
                   <p className="text-[11px] text-gray-400 font-mono">{v.agent}</p>
                 </div>
               </div>
-              <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
-                {verifiedAt && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Verified</span><span className="text-xs text-gray-700">{formatTs(verifiedAt)}</span></div>}
-                {chain && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Chain</span><span className="text-xs text-gray-700">World Chain ({chain})</span></div>}
-                {label && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">ENS</span><span className="text-xs text-emerald-600 font-medium">{label}.humanbacked.eth</span></div>}
-                <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Status</span><span className="text-xs text-emerald-600 font-medium">Verified</span></div>
-              </div>
-              {desc && <p className="mt-3 text-[11px] text-gray-400 italic">{desc}</p>}
-              <div className="mt-4 pt-3 border-t border-gray-100">
-                <p className="text-[10px] text-gray-300 font-mono mb-2">ENS Text Records (on-chain)</p>
-                {v.records.map(r => (
-                  <div key={r.key} className="flex gap-1.5 text-[10px] font-mono leading-relaxed">
-                    <span className="text-emerald-500/70">{r.key}:</span>
-                    <span className="text-gray-400">{r.key === "humangate.verifiedAt" ? formatTs(r.value) : r.value.length > 30 ? trunc(r.value) : r.value}</span>
-                  </div>
-                ))}
-              </div>
             </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100">
+              {(["passport", "services", "credentials"] as const).map(t => (
+                <button key={t} onClick={() => setPassportTab(t)}
+                  className={`flex-1 py-3 text-[11px] font-medium transition-all ${passportTab === t ? "text-emerald-600 border-b-2 border-emerald-500" : "text-gray-400 hover:text-gray-600"}`}>
+                  {t === "passport" ? "Passport" : t === "services" ? "Services" : "Credentials"}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab content */}
+            <div className="p-6">
+              {/* PASSPORT TAB */}
+              {passportTab === "passport" && (
+                <div>
+                  <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
+                    {verifiedAt && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Verified</span><span className="text-xs text-gray-700">{formatTs(verifiedAt)}</span></div>}
+                    {chain && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Chain</span><span className="text-xs text-gray-700">World Chain ({chain})</span></div>}
+                    {label && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">ENS</span><span className="text-xs text-emerald-600 font-medium">{label}.humanbacked.eth</span></div>}
+                    <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Status</span><span className="text-xs text-emerald-600 font-medium">Verified</span></div>
+                  </div>
+                  {desc && <p className="mt-3 text-[11px] text-gray-400 italic">{desc}</p>}
+                  <div className="mt-4 pt-3 border-t border-gray-100">
+                    <p className="text-[10px] text-gray-300 font-mono mb-2">ENS Text Records (on-chain)</p>
+                    {v.records.map(r => (
+                      <div key={r.key} className="flex gap-1.5 text-[10px] font-mono leading-relaxed">
+                        <span className="text-emerald-500/70">{r.key}:</span>
+                        <span className="text-gray-400">{r.key === "humangate.verifiedAt" ? formatTs(r.value) : r.value.length > 30 ? trunc(r.value) : r.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* SERVICES TAB */}
+              {passportTab === "services" && (
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-4">No CAPTCHA needed. Your agent passes the gate autonomously.</p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-emerald-500"><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3" /><path d="M7 10h6M10 7v6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">Token Faucet</p>
+                          <p className="text-[10px] text-gray-400">Claim testnet tokens</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-medium text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full">Access granted</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-blue-500"><path d="M4 6h12M4 10h12M4 14h8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">Protected API</p>
+                          <p className="text-[10px] text-gray-400">Rate-limited data access</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-medium text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full">Access granted</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-purple-500"><path d="M10 2l2.5 5 5.5.8-4 3.9.9 5.3L10 14.5 5.1 17l.9-5.3-4-3.9 5.5-.8L10 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">Bounty Board</p>
+                          <p className="text-[10px] text-gray-400">Claim bounties autonomously</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-medium text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full">Access granted</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CREDENTIALS TAB */}
+              {passportTab === "credentials" && (
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-4">Assign these to your agent so it can operate autonomously.</p>
+                  <div className="space-y-2">
+                    <div className="rounded-md bg-gray-50 p-3">
+                      <p className="text-[9px] text-gray-400 mb-0.5">WALLET ADDRESS</p>
+                      <p className="text-[11px] font-mono text-gray-600 break-all select-all">{v.agent}</p>
+                    </div>
+                    {generatedKey && (
+                      <div className="rounded-md bg-amber-50 border border-amber-100 p-3">
+                        <p className="text-[9px] text-amber-500 mb-0.5">PRIVATE KEY — save this</p>
+                        <p className="text-[11px] font-mono text-amber-700 break-all select-all">{generatedKey}</p>
+                      </div>
+                    )}
+                    <div className="rounded-md bg-gray-50 p-3">
+                      <p className="text-[9px] text-gray-400 mb-0.5">ENS NAME</p>
+                      <p className="text-[11px] font-mono text-emerald-600 select-all">{v.ensName}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
             <div className="px-6 py-3 flex justify-between items-center" style={{ background: "#fafafa", borderTop: "1px solid #eee" }}>
               <div className="flex items-center gap-1.5">
                 <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-gray-300"><path d="M12 2L3 7v5c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg>
                 <span className="text-[10px] text-gray-400 font-medium">HumanGate</span>
               </div>
-              <button onClick={() => { setView({ step: "captcha" }); setAgent(""); setAgentLabel(""); setChecked(false); setGeneratedKey(""); }} className="text-[10px] text-gray-400 hover:text-gray-600">Check another</button>
+              <button onClick={() => { setView({ step: "captcha" }); setAgent(""); setAgentLabel(""); setChecked(false); setGeneratedKey(""); setPassportTab("passport"); }} className="text-[10px] text-gray-400 hover:text-gray-600">Check another</button>
             </div>
           </div>
-
-          {/* What your agent can do now */}
-          <div className="mt-4 rounded-lg overflow-hidden animate-fade-in-up" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-            <div className="px-6 py-4 border-b border-gray-100">
-              <p className="text-sm font-bold text-gray-900">Your agent can now access:</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">No CAPTCHA needed. Your agent passes the gate autonomously.</p>
-            </div>
-
-            {/* Faucet example */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  <svg viewBox="0 0 20 20" fill="none" className="h-4.5 w-4.5 text-emerald-500">
-                    <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.3" />
-                    <path d="M7 10h6M10 7v6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-700">Token Faucet</p>
-                  <p className="text-[10px] text-gray-400">Claim testnet tokens</p>
-                </div>
-              </div>
-              <span className="text-[10px] font-medium text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full">Access granted</span>
-            </div>
-
-            {/* API example */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                  <svg viewBox="0 0 20 20" fill="none" className="h-4.5 w-4.5 text-blue-500">
-                    <path d="M4 6h12M4 10h12M4 14h8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-700">Protected API</p>
-                  <p className="text-[10px] text-gray-400">Rate-limited data access</p>
-                </div>
-              </div>
-              <span className="text-[10px] font-medium text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full">Access granted</span>
-            </div>
-
-            {/* Bounty example */}
-            <div className="px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-purple-50 flex items-center justify-center">
-                  <svg viewBox="0 0 20 20" fill="none" className="h-4.5 w-4.5 text-purple-500">
-                    <path d="M10 2l2.5 5 5.5.8-4 3.9.9 5.3L10 14.5 5.1 17l.9-5.3-4-3.9 5.5-.8L10 2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-700">Bounty Board</p>
-                  <p className="text-[10px] text-gray-400">Claim bounties autonomously</p>
-                </div>
-              </div>
-              <span className="text-[10px] font-medium text-emerald-500 bg-emerald-50 px-2.5 py-1 rounded-full">Access granted</span>
-            </div>
-          </div>
-
-          {/* Agent wallet info */}
-          {generatedKey && (
-            <div className="mt-4 rounded-lg overflow-hidden animate-fade-in-up" style={{ background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
-              <div className="px-6 py-4">
-                <p className="text-xs font-bold text-gray-900 mb-2">Agent credentials</p>
-                <p className="text-[10px] text-gray-400 mb-3">Assign these to your agent so it can operate autonomously.</p>
-                <div className="space-y-2">
-                  <div className="rounded-md bg-gray-50 p-3">
-                    <p className="text-[9px] text-gray-400 mb-0.5">WALLET ADDRESS</p>
-                    <p className="text-[11px] font-mono text-gray-600 break-all select-all">{v.agent}</p>
-                  </div>
-                  <div className="rounded-md bg-amber-50 border border-amber-100 p-3">
-                    <p className="text-[9px] text-amber-500 mb-0.5">PRIVATE KEY — save this</p>
-                    <p className="text-[11px] font-mono text-amber-700 break-all select-all">{generatedKey}</p>
-                  </div>
-                  <div className="rounded-md bg-gray-50 p-3">
-                    <p className="text-[9px] text-gray-400 mb-0.5">ENS NAME</p>
-                    <p className="text-[11px] font-mono text-emerald-600 select-all">{v.ensName}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </main>
     );
