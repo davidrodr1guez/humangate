@@ -32,6 +32,7 @@ export default function Home() {
   const [view, setView] = useState<View>({ step: "captcha" });
   const [agent, setAgent] = useState("");
   const agentRef = React.useRef("");
+  const labelRef = React.useRef("");
   const [agentLabel, setAgentLabel] = useState("");
   const [generatedKey, setGeneratedKey] = useState("");
   const [showWalletInput, setShowWalletInput] = useState(false);
@@ -47,10 +48,11 @@ export default function Home() {
 
   // Keep ref in sync
   useEffect(() => { agentRef.current = agent; }, [agent]);
+  useEffect(() => { labelRef.current = agentLabel; }, [agentLabel]);
 
   useEffect(() => {
     if (view.step === "expand" && view.mode === "human") {
-      fetch("/api/rp-signature", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify-agent-v8" }) })
+      fetch("/api/rp-signature", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify-agent-v9" }) })
         .then(r => { if (!r.ok) throw new Error(); return r.json(); })
         .then(data => { setRpContext({ rp_id: data.rp_id, nonce: data.nonce, created_at: data.created_at, expires_at: data.expires_at, signature: data.sig }); setRpReady(true); })
         .catch(() => setRpReady(true));
@@ -109,7 +111,7 @@ export default function Home() {
     try {
       const response = result.responses?.[0] ?? result;
       const res = await fetch("/api/verify", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proof: { merkle_root: response.merkle_root, nullifier_hash: response.nullifier_hash ?? response.nullifier, proof: response.proof }, agentId: currentAgent, agentLabel: agentLabel || undefined, idkitPayload: result }),
+        body: JSON.stringify({ proof: { merkle_root: response.merkle_root, nullifier_hash: response.nullifier_hash ?? response.nullifier, proof: response.proof }, agentId: currentAgent, agentLabel: labelRef.current || undefined, idkitPayload: result }),
       });
       const data = await res.json();
       console.log("Verify response:", res.status, data);
@@ -463,7 +465,7 @@ export default function Home() {
                       Verify with World ID
                     </button>
                     {agent && (
-                      <IDKitRequestWidget open={open} onOpenChange={setOpen} app_id={appId} action="verify-agent-v8"
+                      <IDKitRequestWidget open={open} onOpenChange={setOpen} app_id={appId} action="verify-agent-v9"
                         rp_context={rpContext ?? { rp_id: "", nonce: "", created_at: 0, expires_at: 0, signature: "" }}
                         allow_legacy_proofs preset={deviceLegacy({ signal: agent })} environment="production"
                         handleVerify={handleVerify} onSuccess={() => {}} onError={() => {}} />
