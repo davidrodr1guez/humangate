@@ -205,18 +205,25 @@ export async function POST(request: Request) {
     const label = agentLabel || (agentId as string).slice(2, 10).toLowerCase();
     let ensName: string | null = `${label}.humanbacked.eth`;
     if (resolverAddress) {
+      // Fire and don't await receipt — avoid Vercel function timeout
+      // The tx will still land on-chain even if the function returns first
       try {
         // @ts-ignore
-        const ensTx = await wallet.writeContract({
+        wallet.writeContract({
           account,
           chain: worldChain,
           address: resolverAddress,
           abi: resolverAbi,
           functionName: "registerAgent",
           args: [agentId as Hex, label],
+        }).then((ensTx: Hex) => {
+          console.log("ENS tx sent:", ensTx);
+          pub.waitForTransactionReceipt({ hash: ensTx }).then(() => {
+            console.log("ENS registered:", label + ".humanbacked.eth");
+          }).catch(() => {});
+        }).catch((err: any) => {
+          console.warn("ENS registration failed:", err?.message?.slice(0, 100));
         });
-        await pub.waitForTransactionReceipt({ hash: ensTx });
-        console.log("ENS registered:", label + ".humanbacked.eth", ensTx);
       } catch (err) {
         console.warn("ENS registration failed (non-fatal):", err);
       }
