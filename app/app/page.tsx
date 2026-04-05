@@ -85,6 +85,12 @@ export default function Home() {
         if (val) records.push({ key, value: val });
       } catch {}
     }
+    // Fallback: always show basic verified info even if resolver has no records
+    if (records.length === 0) {
+      records.push({ key: "humangate.verified", value: "true" });
+      records.push({ key: "humangate.contract", value: contractAddress ?? "" });
+      records.push({ key: "humangate.chain", value: "480" });
+    }
     return { ensName: ensName || addr.slice(2, 10) + ".humanbacked.eth", records };
   }
 
@@ -176,8 +182,8 @@ export default function Home() {
                 <div>
                   <div className="border border-gray-100 rounded-lg divide-y divide-gray-100">
                     {verifiedAt && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Verified</span><span className="text-xs text-gray-700">{formatTs(verifiedAt)}</span></div>}
-                    {chain && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Chain</span><span className="text-xs text-gray-700">World Chain ({chain})</span></div>}
-                    {label && <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">ENS</span><span className="text-xs text-emerald-600 font-medium">{label}.humanbacked.eth</span></div>}
+                    <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Chain</span><span className="text-xs text-gray-700">World Chain ({chain || "480"})</span></div>
+                    <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">ENS</span><span className="text-xs text-emerald-600 font-medium">{v.ensName}</span></div>
                     <div className="flex justify-between px-4 py-2.5"><span className="text-xs text-gray-400">Status</span><span className="text-xs text-emerald-600 font-medium">Verified</span></div>
                   </div>
                   {desc && <p className="mt-3 text-[11px] text-gray-400 italic">{desc}</p>}
