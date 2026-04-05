@@ -115,7 +115,16 @@ export default function Home() {
       });
       const data = await res.json();
       console.log("Verify response:", res.status, data);
-      if (!res.ok) { alert("Verification error: " + (data.error || "Unknown")); setView({ step: "expand", mode: "human" }); return; }
+      if (!res.ok) {
+        if (data.code === "ALREADY_VERIFIED") {
+          const d = await fetchRecords(currentAgent);
+          setView({ step: "passed", agent: currentAgent, ...d });
+          return;
+        }
+        alert(data.error || "Verification failed");
+        setView({ step: "expand", mode: "human" });
+        return;
+      }
       const d = await fetchRecords(currentAgent);
       setView({ step: "passed", agent: currentAgent, ...d });
     } catch (err: any) { console.error("handleVerify error:", err); alert("Error: " + err.message); setView({ step: "expand", mode: "human" }); }

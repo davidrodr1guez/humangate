@@ -95,6 +95,20 @@ contract HumanGate {
         emit AgentVerified(agent, nullifierHash);
     }
 
+    // ---- operator: reset nullifier ----
+    /// @notice Allow operator to clear a used nullifier (for testing / re-verification).
+    function resetNullifier(uint256 nullifierHash) external {
+        if (msg.sender != operator) revert NotOperator();
+        _usedNullifiers[nullifierHash] = false;
+    }
+
+    /// @notice Allow operator to unverify an agent and clear its nullifier in one call.
+    function resetAgent(address agent, uint256 nullifierHash) external {
+        if (msg.sender != operator) revert NotOperator();
+        _usedNullifiers[nullifierHash] = false;
+        verifiedAgents[agent] = false;
+    }
+
     /// @notice Read-only check — the standard interface
     function isVerified(address agent) external view returns (bool) {
         return verifiedAgents[agent];
