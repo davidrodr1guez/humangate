@@ -152,54 +152,51 @@ export async function POST(request: Request) {
     });
 
     // Check if agent is already verified on-chain before sending tx
+    let alreadyOnChain = false;
+    let txHash: Hex | undefined;
     try {
       // @ts-ignore
-      const alreadyVerified = await pub.readContract({
+      alreadyOnChain = await pub.readContract({
         address: contractAddress,
         abi: gateAbi,
         functionName: "isVerified",
         args: [agentId as Hex],
       });
-      if (alreadyVerified) {
-        return NextResponse.json(
-          { error: "This agent is already verified on HumanGate.", code: "ALREADY_VERIFIED" },
-          { status: 409 }
-        );
-      }
     } catch {}
 
-    console.log("Registering agent on-chain via registerVerified...");
-    let txHash: Hex;
-    try {
-      // @ts-ignore
-      txHash = await wallet.writeContract({
-        account,
-        chain: worldChain,
-        address: contractAddress,
-        abi: gateAbi,
-        functionName: "registerVerified",
-        args: [
-          agentId as Hex,
-          BigInt(nullifierHash),
-        ],
-      });
-      await pub.waitForTransactionReceipt({ hash: txHash });
-      console.log("Agent registered on-chain:", txHash);
-    } catch (txErr: any) {
-      const msg = txErr?.message ?? "";
-      if (msg.includes("AlreadyVerified") || msg.includes("0x118fd7b8")) {
-        return NextResponse.json(
-          { error: "This World ID proof has already been used. Each person can only verify once.", code: "ALREADY_VERIFIED" },
-          { status: 409 }
-        );
+    if (alreadyOnChain) {
+      console.log("Agent already verified on-chain, skipping registerVerified");
+    } else {
+      console.log("Registering agent on-chain via registerVerified...");
+      try {
+        // @ts-ignore
+        txHash = await wallet.writeContract({
+          account,
+          chain: worldChain,
+          address: contractAddress,
+          abi: gateAbi,
+          functionName: "registerVerified",
+          args: [
+            agentId as Hex,
+            BigInt(nullifierHash),
+          ],
+        });
+        await pub.waitForTransactionReceipt({ hash: txHash });
+        console.log("Agent registered on-chain:", txHash);
+      } catch (txErr: any) {
+        const msg = txErr?.message ?? "";
+        if (msg.includes("AlreadyVerified") || msg.includes("0x118fd7b8")) {
+          alreadyOnChain = true;
+          console.log("Nullifier already used, proceeding to ENS registration");
+        } else if (msg.includes("NotOperator") || msg.includes("0x7c214f04")) {
+          return NextResponse.json(
+            { error: "Server operator mismatch. Please contact support.", code: "NOT_OPERATOR" },
+            { status: 403 }
+          );
+        } else {
+          throw txErr;
+        }
       }
-      if (msg.includes("NotOperator") || msg.includes("0x7c214f04")) {
-        return NextResponse.json(
-          { error: "Server operator mismatch. Please contact support.", code: "NOT_OPERATOR" },
-          { status: 403 }
-        );
-      }
-      throw txErr;
     }
 
     // ---------- Step 3: Register ENS subname ----------
