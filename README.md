@@ -55,17 +55,11 @@ Any smart contract, any API, any service — just call `isVerified()`. That's it
 
 ### How it works
 
-```
-                    ┌──────────────────────┐
-   Agents           │    HumanGate         │        Services
-   (bots +          │    Gateway           │        (faucets, dapps,
-    human-backed)   │                      │         APIs, etc.)
-        ───────────>│  shared whitelist    │───────────>
-                    │  + EIP-712 passes    │
-                    │                      │
-                    │  ✓ human-backed      │──> ACCESS
-                    │  ✗ not verified      │──> BLOCKED
-                    └──────────────────────┘
+```mermaid
+flowchart LR
+    A["Agents\n(bots + human-backed)"] --> G["HumanGate\nGateway\n\nshared whitelist\n+ EIP-712 passes"]
+    G -->|"✓ human-backed"| S["Services\n(faucets, dapps,\nAPIs, etc.)\n\nACCESS"]
+    G -->|"✗ not verified"| B["BLOCKED"]
 ```
 
 1. A human verifies **once** with World ID (ZK proof, Orb level)
@@ -111,22 +105,13 @@ const verified = await isAgentVerified(contractAddress, agentAddress);
 
 HumanGate grows the same way Stripe did — a two-sided network effect:
 
-```
-  More services integrate HumanGate (1 line: isVerified())
-      │
-      ▼
-  More agents NEED to verify to access those services
-      │
-      ▼
-  More humans verify their agents (2 txs on World Chain each)
-      │
-      ▼
-  The shared whitelist grows — more verified agents
-      │
-      ▼
-  More valuable for NEW services to integrate (bigger whitelist = more users)
-      │
-      └──────────────── back to top ────────────────┘
+```mermaid
+flowchart TD
+    A["More services integrate HumanGate\n(1 line: isVerified())"] --> B["More agents NEED to verify\nto access those services"]
+    B --> C["More humans verify their agents\n(2 txs on World Chain each)"]
+    C --> D["The shared whitelist grows\n— more verified agents"]
+    D --> E["More valuable for NEW services\nto integrate (bigger whitelist = more users)"]
+    E --> A
 ```
 
 Each side feeds the other. If every service builds its own whitelist, there's no network effect. With one shared whitelist, there is.
@@ -135,34 +120,37 @@ Each side feeds the other. If every service builds its own whitelist, there's no
 
 ## How It Works
 
+```mermaid
+sequenceDiagram
+    title ONE-TIME SETUP (human present)
+    participant H as Human
+    participant W as World App
+    participant API as HumanGate API
+    participant C as World Chain
+
+    H->>W: scan QR
+    W->>API: ZK proof
+    API->>C: verifyAgent()
+    C-->>API: tx confirmed
+    API->>C: registerAgent()
+    C-->>API: ENS + text records
+    API-->>W: EIP-712 signature
+    W-->>H: pass issued
 ```
-                           ONE-TIME SETUP (human present)
-                          ================================
 
-  Human                World App              HumanGate API              World Chain
-    |                     |                        |                         |
-    |--- scan QR -------->|                        |                         |
-    |                     |--- ZK proof ---------->|                         |
-    |                     |                        |--- verifyAgent() ------>|
-    |                     |                        |<-- tx confirmed --------|
-    |                     |                        |--- registerAgent() ---->|
-    |                     |                        |<-- ENS + text records --|
-    |                     |                        |                         |
-    |<-- pass issued -----|<-- EIP-712 signature --|                         |
+```mermaid
+sequenceDiagram
+    title AUTONOMOUS USAGE (agent alone, no human needed)
+    participant A as Agent
+    participant S as Any Service
+    participant SDK as HumanGate SDK
 
+    A->>S: present pass
+    S->>SDK: verifyPass()
+    SDK-->>S: { valid: true }
+    S-->>A: ACCESS GRANTED
 
-                        AUTONOMOUS USAGE (agent alone)
-                       ==================================
-
-  Agent                  Any Service           HumanGate SDK
-    |                        |                      |
-    |--- present pass ------>|                      |
-    |                        |--- verifyPass() ---->|
-    |                        |<-- { valid: true } --|
-    |<-- ACCESS GRANTED -----|                      |
-    |                        |                      |
-    |  (no human needed)     | (no gas, no RPC,     |
-    |  (no World App)        |  pure ecrecover)     |
+    Note over S,SDK: No gas, no RPC — pure ecrecover
 ```
 
 ### The Flow
@@ -208,53 +196,45 @@ Query any address to check its on-chain verification status and ENS identity.
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (Next.js 14)                     │
-│                                                                  │
-│  /demo          /widget           /dashboard                     │
-│  CAPTCHA-like   IDKit v4 +        On-chain                      │
-│  gate demo      verification      agent lookup                   │
-└──────┬──────────────┬──────────────────┬─────────────────────────┘
-       │              │                  │
-       ▼              ▼                  ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                          API LAYER                               │
-│                                                                  │
-│  /api/verify        /api/check-pass       /api/rp-signature      │
-│  Full pipeline:     EIP-712 pass          RP signing for         │
-│  on-chain verify    validation            IDKit v4               │
-│  + ENS register     (ecrecover,                                  │
-│  + sign pass        no gas)                                      │
-└──────┬──────────────────────────────────────────────────────────┘
-       │
-       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                    WORLD CHAIN (chainId: 480)                    │
-│                                                                  │
-│  ┌─────────────────────┐    ┌────────────────────────────────┐  │
-│  │    HumanGate.sol     │    │   HumanGateResolver.sol        │  │
-│  │                      │    │                                │  │
-│  │  verifyAgent()       │    │  registerAgent()               │  │
-│  │  isVerified()        │    │  text() / setText()            │  │
-│  │                      │    │  resolve() [ENSIP-10]          │  │
-│  │  WorldID Router ──┐  │    │                                │  │
-│  │  ZK proof verify  │  │───>│  {addr}.humanbacked.eth        │  │
-│  │  Nullifier check  │  │    │  Text records (6 default)      │  │
-│  │  Sybil resistance │  │    │  ENSIP-25 verification loop    │  │
-│  └───────────────────┘  │    └────────────────────────────────┘  │
-│                          │                                        │
-└──────────────────────────────────────────────────────────────────┘
-       │
-       ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                     SDK (TypeScript + viem)                       │
-│                                                                  │
-│  verifyPass()          — Local pass verification (ecrecover)     │
-│  isAgentVerified()     — On-chain status check                   │
-│  verifyAgentOnChain()  — Submit proof to contract                │
-│  getPassDomain()       — EIP-712 domain for any integration      │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Frontend["FRONTEND (Next.js 14)"]
+        demo["/demo\nCAPTCHA-like gate demo"]
+        widget["/widget\nIDKit v4 + verification"]
+        dashboard["/dashboard\nOn-chain agent lookup"]
+    end
+
+    subgraph API["API LAYER"]
+        verify["/api/verify\nOn-chain verify + ENS register + sign pass"]
+        check["/api/check-pass\nEIP-712 pass validation (ecrecover, no gas)"]
+        rp["/api/rp-signature\nRP signing for IDKit v4"]
+    end
+
+    subgraph Chain["WORLD CHAIN (chainId: 480)"]
+        subgraph Gate["HumanGate.sol"]
+            vAgent["verifyAgent()"]
+            isV["isVerified()"]
+            wid["WorldID Router\nZK proof verify\nNullifier check\nSybil resistance"]
+        end
+        subgraph Resolver["HumanGateResolver.sol"]
+            regA["registerAgent()"]
+            txt["text() / setText()"]
+            res["resolve() — ENSIP-10"]
+            ens["{addr}.humanbacked.eth\nText records (6 default)\nENSIP-25 verification loop"]
+        end
+        Gate -->|"isVerified?"| Resolver
+    end
+
+    subgraph SDK["SDK (TypeScript + viem)"]
+        vp["verifyPass() — Local pass verification (ecrecover)"]
+        ia["isAgentVerified() — On-chain status check"]
+        va["verifyAgentOnChain() — Submit proof to contract"]
+        gp["getPassDomain() — EIP-712 domain for any integration"]
+    end
+
+    Frontend --> API
+    API --> Chain
+    Chain --> SDK
 ```
 
 ## Smart Contracts
